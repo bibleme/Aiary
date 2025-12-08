@@ -44,3 +44,10 @@ data class DiaryResponse(
     val diary_text: String,
     val image_url: String?
 )
+
+// 비밀번호 변경 요청 데이터
+data class ChangePasswordRequest(
+    val email: String, // 누군지 알아야 하니 이메일 추가
+    val current_password: String,
+    val new_password: String
+)
