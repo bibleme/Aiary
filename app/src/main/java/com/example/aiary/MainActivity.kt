@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.sp
 import com.example.aiary.network.RetrofitClient
 import com.example.aiary.ui.theme.AiaryLoginTheme
 import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalContext
 
 // 색상 정의
 val PrimaryBlue = Color(0xFFa7c5eb)
@@ -41,6 +42,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent {
             AiaryLoginTheme {
+                val context = LocalContext.current
                 // 화면 상태 관리
                 // 0: 로그인, 1: 홈, 2: 업로드, 3: 회원가입
                 var currentScreen by remember { mutableIntStateOf(0) }
@@ -56,7 +58,12 @@ class MainActivity : ComponentActivity() {
                                 onLoginSuccess = { currentScreen = 1 },
                                 onSignUpClick = { currentScreen = 3 }
                             )
-                            1 -> HomeScreen(onNavigateToUpload = { currentScreen = 2 })
+                            1 -> HomeScreen(onNavigateToUpload = { currentScreen = 2 },
+                                onLogout = {
+                                    currentScreen = 0
+                                    Toast.makeText(context, "로그아웃 되었습니다.", Toast.LENGTH_SHORT).show()
+                                }
+                            )
                             2 -> ImageUploadScreen(onBack = { currentScreen = 1 })
                             3 -> SignUpScreen(onNavigateToLogin = { currentScreen = 0 })
                         }
