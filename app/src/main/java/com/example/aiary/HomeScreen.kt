@@ -37,7 +37,8 @@ private val White = Color(0xFFFFFFFF)
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun HomeScreen(onNavigateToUpload: () -> Unit) {
+fun HomeScreen(onNavigateToUpload: () -> Unit,
+               onLogout: () -> Unit) {
     // 하단바 선택 상태 관리 (0: 홈, 1: 카드형, 2: 스토리, 3: 마이페이지)
     var selectedItem by remember { mutableIntStateOf(0) }
 
@@ -205,17 +206,19 @@ fun HomeScreen(onNavigateToUpload: () -> Unit) {
 
                 3 -> {
                     // 마이페이지
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("마이페이지 준비 중...", color = Color.Gray)
+                    MyPageScreen ( onLogout = onLogout )
                     }
                 }
             }
         }
     }
-}
+
 
 @Preview(showBackground = true)
 @Composable
 fun HomeScreenPreview() {
-    HomeScreen(onNavigateToUpload = {})
+    HomeScreen(
+        onNavigateToUpload = {},
+        onLogout = {}
+    )
 }
