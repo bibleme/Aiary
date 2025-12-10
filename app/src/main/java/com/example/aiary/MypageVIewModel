@@ -15,7 +15,6 @@ class MypageViewModel : ViewModel() {
     fun changePassword(context: Context, currentPw: String, newPw: String) {
         viewModelScope.launch {
             try {
-                // TODO: 실제 사용자의 이메일을 가져오는 로직이 필요함 (지금은 하드코딩)
                 val myEmail = UserSession.userEmail
 
                 val request = ChangePasswordRequest(
