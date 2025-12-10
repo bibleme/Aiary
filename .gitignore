@@ -34,3 +34,7 @@ models/day_diary_from_summary_v2/
 *.pt
 *.bin
 *.ckpt
+models/
+*.safetensors
+*.bin
+*.pth
