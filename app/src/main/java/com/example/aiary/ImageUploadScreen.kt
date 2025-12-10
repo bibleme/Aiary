@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.aiary.data.UserSession
 import com.example.aiary.network.RetrofitClient
 import kotlinx.coroutines.launch
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -146,7 +147,7 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                     isLoading = true // 로딩 시작
 
                     coroutineScope.launch {
-                       try {
+                        try {
                             // Uri -> 실제 파일로 변환
                             val file = getFileFromUri(context, selectedImageUri!!)
 
@@ -154,16 +155,17 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                                 // Multipart 형식으로 변환
                                 val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
                                 val body = MultipartBody.Part.createFormData("photo", file.name, requestFile)
-                                val babyIdBody = "1".toRequestBody("text/plain".toMediaTypeOrNull())
+                                val myId = UserSession.userId.toString()
+                                val userIdBody = myId.toRequestBody("text/plain".toMediaTypeOrNull())
 
                                 // 서버로 전송 (Retrofit)
-                                val response = RetrofitClient.api.createDiary(babyIdBody, body)
+                                val response = RetrofitClient.api.createDiary(userIdBody, body)
 
                                 if (response.isSuccessful) {
                                     val result = response.body()
                                     // 성공 시 로직
                                     Toast.makeText(context, "AI 일기 생성 완료!", Toast.LENGTH_LONG).show()
-                                    println("생성된 일기: ${result?.diary_text}")
+                                    println("생성된 일기: ${result?.diary?.content}")
 
                                     // TODO: 여기서 결과 화면으로 이동하거나 다이어리 탭으로 이동
                                     onBack() // 임시로 홈으로 이동
@@ -232,4 +234,4 @@ fun getFileFromUri(context: android.content.Context, uri: android.net.Uri): java
         inputStream.copyTo(output)
     }
     return tempFile
-}
+} // 251210 수정
