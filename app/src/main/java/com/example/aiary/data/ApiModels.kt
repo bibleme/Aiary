@@ -51,7 +51,7 @@ data class DaySummaryRequest(
 // 7. 하루 줄글 일기 응답
 data class FullDiaryResponse(
     val status: String,
-    val full_diary: String, // KoBART가 만든 줄글 일기
+    val summary: String, // KoBART가 만든 줄글 일기
     val bullet_lines: List<String>?,
     val combined_summary: String?
 )
