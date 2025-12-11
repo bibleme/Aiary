@@ -115,23 +115,27 @@ fun CardDiaryScreen(
 
                 // 3. UI용 데이터로 변환 (이미지 주소 고치기!)
                 diaryPhotos = filteredDiaries.map {
-                    // 만약 서버가 준 주소(it.image_url)가 "http"로 시작하지 않는다면?
-                    // 앞에 서버 주소를 강제로 붙여줍니다.
+                    // 서버가 준 주소: "/media/images/20251211_...jpg"
+                    // 우리가 만들 주소: "http://15.164.215.237:8000/media/images/20251211_...jpg"
+
                     val fixedUrl = if (it.image_url.startsWith("http")) {
                         it.image_url
                     } else {
-                        // 팀원이 준 서버 주소를 앞에 붙임 (마지막에 /가 있는지 확인!)
-                        "http://15.164.215.237:8000/${it.image_url}"
+                        // 🚨 슬래시(/)가 겹치지 않게 처리해야 합니다.
+                        // 서버 주소: http://15.164.215.237:8000 (맨 뒤에 / 없음)
+                        // 이미지 주소: /media/images/... (맨 앞에 / 있음)
+                        val baseUrl = "http://15.164.215.237:8000"
+                        "$baseUrl${it.image_url}"
                     }
 
-                    // 로그로 주소가 잘 만들어졌는지 확인해보세요
+                    // 로그로 주소가 잘 만들어졌는지 확인해보세요 (이 주소를 크롬에 치면 나와야 함!)
                     Log.d("DIARY_DEBUG", "원본: ${it.image_url} -> 수정후: $fixedUrl")
 
                     DiaryPhoto(fixedUrl, it.content)
                 }
 
                 // 4. 사진이 있다면, 줄글 요약 일기도 가져오기 (POST /diaries/summary-json)
-                if (filteredDiaries.isNotEmpty()) {
+                /* if (filteredDiaries.isNotEmpty()) {
                     val summaryRequest = DaySummaryRequest(myId, targetDate)
                     val summaryResponse = RetrofitClient.api.createFullDiary(summaryRequest)
 
@@ -142,7 +146,33 @@ fun CardDiaryScreen(
                     }
                 } else {
                     fullDiaryText = "작성된 일기가 없는 날입니다."
+                }*/
+
+                // 4. 사진이 있다면, 줄글 요약 일기도 가져오기
+                if (filteredDiaries.isNotEmpty()) {
+                    Log.d("DIARY_DEBUG", "줄글 일기 요청 시작: ID=$myId, Date=$targetDate")
+
+                    val summaryRequest = DaySummaryRequest(myId, targetDate)
+                    val summaryResponse = RetrofitClient.api.createFullDiary(summaryRequest)
+
+                    if (summaryResponse.isSuccessful) {
+                        val result = summaryResponse.body()
+                        Log.d("DIARY_DEBUG", "줄글 일기 응답 성공: ${result?.summary}")
+
+                        fullDiaryText = result?.summary ?: "서버에서 빈 내용을 보냈습니다."
+                    } else {
+                        // 실패 원인을 로그에 출력
+                        val errorMsg = summaryResponse.errorBody()?.string()
+                        Log.e("DIARY_DEBUG", "줄글 일기 요청 실패! 코드: ${summaryResponse.code()}, 내용: $errorMsg")
+
+                        fullDiaryText = "일기 생성 실패: ${summaryResponse.code()} (로그 확인 필요)"
+                    }
+                } else {
+                    fullDiaryText = "작성된 일기가 없는 날입니다."
                 }
+
+
+
 
             } else {
                 Toast.makeText(context, "데이터를 불러오지 못했습니다.", Toast.LENGTH_SHORT).show()
