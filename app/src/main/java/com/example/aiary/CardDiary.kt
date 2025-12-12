@@ -43,7 +43,6 @@ import java.time.format.DateTimeFormatter
 
 private val White = Color(0xFFFFFFFF)
 
-// [수정됨] 이제 이미지는 Int(리소스)가 아니라 String(URL)입니다.
 data class DiaryPhoto(
     val imageUrl: String,
     val comment: String
@@ -53,7 +52,7 @@ data class DiaryPhoto(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun CardDiaryScreen(
-    selectedDate: String, // 예: "2025년 12월 10일"
+    selectedDate: String,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -69,23 +68,7 @@ fun CardDiaryScreen(
         try {
             val myId = UserSession.userId
 
-            /* 1. 전체 일기 리스트 가져오기 (GET /diaries/)
-            val listResponse = RetrofitClient.api.getDiaries(myId)
-
-            if (listResponse.isSuccessful) {
-                val allDiaries = listResponse.body() ?: emptyList()
-
-                // 2. 선택한 날짜에 맞는 일기만 필터링
-                // 서버 날짜 포맷(2025-12-10)과 앱 날짜 포맷(2025년 12월 10일)을 맞춰야 함
-                val targetDate = convertKoreanDateToIso(selectedDate) // "2025-12-10"
-
-                val filteredDiaries = allDiaries.filter {
-                    it.created_at.startsWith(targetDate)
-                }*/
-
-
-
-            // 1. 서버에서 전체 리스트 가져옴
+            // 서버에서 전체 리스트 가져옴
             val listResponse = RetrofitClient.api.getDiaries(myId)
 
             if (listResponse.isSuccessful) {
@@ -97,58 +80,33 @@ fun CardDiaryScreen(
                     Log.d("DIARY_DEBUG", "서버 날짜 예시: ${allDiaries[0].created_at}")
                 }
 
-                // 2. 선택한 날짜 변환 ("2025년 12월 11일" -> "2025-12-11")
+                // 선택한 날짜 변환 ("2025년 12월 11일" -> "2025-12-11")
                 val targetDate = convertKoreanDateToIso(selectedDate)
                 Log.d("DIARY_DEBUG", "내가 찾는 날짜: $targetDate")
 
-                // 3. 날짜 비교 (앞부분 10자리만 잘라서 비교)
+                // 날짜 비교 (앞부분 10자리만 잘라서 비교)
                 val filteredDiaries = allDiaries.filter { diary ->
                     // 서버 날짜가 "2025-12-11T..." 형태라면 앞 10글자("2025-12-11")만 자름
                     val serverDate = if (diary.created_at.length >= 10) diary.created_at.substring(0, 10) else diary.created_at
                     serverDate == targetDate
                 }
 
-                // UI용 데이터로 변환
-                // diaryPhotos = filteredDiaries.map {
-                //    DiaryPhoto(it.image_url, it.content)
-                // }
-
-                // 3. UI용 데이터로 변환 (이미지 주소 고치기!)
+                // UI용 데이터로 변환 (이미지 주소 고치기!)
                 diaryPhotos = filteredDiaries.map {
-                    // 서버가 준 주소: "/media/images/20251211_...jpg"
-                    // 우리가 만들 주소: "http://15.164.215.237:8000/media/images/20251211_...jpg"
 
                     val fixedUrl = if (it.image_url.startsWith("http")) {
                         it.image_url
                     } else {
-                        // 🚨 슬래시(/)가 겹치지 않게 처리해야 합니다.
-                        // 서버 주소: http://15.164.215.237:8000 (맨 뒤에 / 없음)
-                        // 이미지 주소: /media/images/... (맨 앞에 / 있음)
                         val baseUrl = "http://15.164.215.237:8000"
                         "$baseUrl${it.image_url}"
                     }
-
-                    // 로그로 주소가 잘 만들어졌는지 확인해보세요 (이 주소를 크롬에 치면 나와야 함!)
+                    
                     Log.d("DIARY_DEBUG", "원본: ${it.image_url} -> 수정후: $fixedUrl")
 
                     DiaryPhoto(fixedUrl, it.content)
                 }
 
-                // 4. 사진이 있다면, 줄글 요약 일기도 가져오기 (POST /diaries/summary-json)
-                /* if (filteredDiaries.isNotEmpty()) {
-                    val summaryRequest = DaySummaryRequest(myId, targetDate)
-                    val summaryResponse = RetrofitClient.api.createFullDiary(summaryRequest)
-
-                    if (summaryResponse.isSuccessful) {
-                        fullDiaryText = summaryResponse.body()?.full_diary ?: "요약된 내용이 없습니다."
-                    } else {
-                        fullDiaryText = "아직 하루 일기가 생성되지 않았습니다. (뒷면을 확인해보세요)"
-                    }
-                } else {
-                    fullDiaryText = "작성된 일기가 없는 날입니다."
-                }*/
-
-                // 4. 사진이 있다면, 줄글 요약 일기도 가져오기
+                // 사진이 있다면, 줄글 요약 일기도 가져오기
                 if (filteredDiaries.isNotEmpty()) {
                     Log.d("DIARY_DEBUG", "줄글 일기 요청 시작: ID=$myId, Date=$targetDate")
 
@@ -269,7 +227,7 @@ fun CardDiaryScreen(
     }
 }
 
-// [수정됨] AsyncImage 사용 (URL 이미지 로딩)
+// AsyncImage 사용 (URL 이미지 로딩)
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FrontSideContent(
@@ -291,18 +249,21 @@ fun FrontSideContent(
                     modifier = Modifier.fillMaxSize()
                 )
             }
-            // ... 화살표 버튼 코드는 그대로 유지 ...
+            
             if (pagerState.currentPage > 0) {
                 IconButton(
                     onClick = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
-                    modifier = Modifier.align(Alignment.CenterStart).padding(8.dp).background(White.copy(0.7f), CircleShape)
+                    modifier = Modifier.align(Alignment.CenterStart).padding(8.dp).background(White.copy(0.7f), 
+                        CircleShape)
                 ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = DarkGray) }
             }
             if (pagerState.currentPage < diaryPhotos.size - 1) {
                 IconButton(
                     onClick = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(8.dp).background(White.copy(0.7f), CircleShape)
-                ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = DarkGray) }
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(8.dp).background(White.copy(0.7f), 
+                        CircleShape)
+                ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, 
+                    null, tint = DarkGray) }
             }
         }
         Spacer(modifier = Modifier.height(20.dp))
@@ -317,7 +278,6 @@ fun FrontSideContent(
     }
 }
 
-// 뒷면 컴포저블은 기존과 동일하므로 생략하거나 그대로 두세요
 @Composable
 fun BackSideContent(fullDiaryText: String) {
     Column(
@@ -342,12 +302,9 @@ fun BackSideContent(fullDiaryText: String) {
 }
 
 // 날짜 변환 헬퍼 함수
-// "2025년 12월 10일" -> "2025-12-10"
 @RequiresApi(Build.VERSION_CODES.O)
 fun convertKoreanDateToIso(koreanDate: String): String {
     return try {
-        // "일" 뒤에 요일이 붙어있을 수 있으므로 공백 기준으로 자르거나 처리
-        // 예: "2025년 12월 10일 수요일" -> "2025년 12월 10일" 부분만 파싱
         val simpleDate = koreanDate.split(" ").take(3).joinToString(" ")
         val formatter = DateTimeFormatter.ofPattern("yyyy년 M월 d일")
         val date = LocalDate.parse(simpleDate, formatter)
