@@ -92,7 +92,7 @@ fun CardDiaryScreen(
                     serverDate == targetDate
                 }
 
-                // UI용 데이터로 변환 (이미지 주소 고치기!)
+                // UI용 데이터로 변환 
                 diaryPhotos = filteredDiaries.map {
 
                     val fixedUrl = if (it.image_url.startsWith("http")) {
@@ -107,7 +107,7 @@ fun CardDiaryScreen(
                     DiaryPhoto(fixedUrl, it.content)
                 }
 
-                // 사진이 있다면, 줄글 요약 일기도 가져오기
+                // 사진이 있다면 줄글 요약 일기도 가져오기
                 if (filteredDiaries.isNotEmpty()) {
                     Log.d("DIARY_DEBUG", "줄글 일기 요청 시작: ID=$myId, Date=$targetDate")
 
