@@ -1,87 +1,112 @@
-🌿 Aiary – AI 기반 사진 자동 일기 생성 서비스
+# 🌿 **Aiary – AI 기반 사진 자동 일기 생성 서비스**
 
-Aiary는 아기의 사진을 올리면 자동으로 한 줄 일기와 하루 줄글 일기를 생성해주는 AI 서비스입니다.
+Aiary는 **아기의 사진을 올리면 자동으로 한 줄 일기와 하루 줄글 일기**를 생성해주는 AI 서비스입니다.
 
-사진 → 한 줄 일기 (GPT Vision 기반)
+* 📸 **사진 → 한 줄 일기 (GPT Vision 기반)**
+* ✏️ **여러 한 줄 일기 → 하루 요약 줄글 일기(GPT 텍스트 요약)**
+* 📘 **최종 하루 줄글 일기 → KoBART fine-tuned 모델 생성**
 
-여러 한 줄 일기 → 하루 요약 줄글 일기 (KoBART fine-tuned 모델 기반)
+FastAPI 백엔드 + Android 프론트 + KoBART 모델이 하나의 프로젝트에서 통합된 AI 데일리 다이어리 앱입니다.
 
-FastAPI 백엔드 + Android 프론트 + 맞춤형 KoBART 모델이 하나의 프로젝트로 통합된 AI 데일리 다이어리 앱입니다.
+---
 
-📂 프로젝트 전체 구조
+## 📂 **프로젝트 전체 구조**
+
+```
 Aiary/
 │
-├── backend/                     # FastAPI 서버
+├── backend/                 # FastAPI 서버
 │
-├── frontend/Android/            # Android(Jetpack Compose) 앱
+├── frontend/Android/        # Android Jetpack Compose 앱
 │
-├── models/                      # 학습 코드 + 다운로드 링크 안내
+├── models/                  # 학습 코드 + KoBART 모델 다운로드 안내
 │
-└── README.md                    # 현재 문서
+└── README.md                # 루트 README
+```
 
-✨ 핵심 기능 요약
-🧠 AI 기능
-기능	사용 기술
-한 줄 일기 생성	GPT-4.1-mini Vision API
-하루 요약 줄글 생성	GPT-4.1-mini 텍스트 요약
-줄글 일기 생성(최종)	KoBART fine-tuned 모델 (팀 모델 담당 제공)
-📡 백엔드(FastAPI)
+---
 
-사진 업로드 API
+## ✨ **핵심 기능 요약**
 
-한 줄 일기 생성 API
+### 🧠 **AI 기능**
 
-하루 줄글 일기 생성 API(GPT)
+| 기능             | 사용 기술                            |
+| -------------- | -------------------------------- |
+| 한 줄 일기 생성      | GPT-4.1-mini Vision API          |
+| 하루 요약 줄글 생성    | GPT-4.1-mini 텍스트 요약              |
+| 하루 줄글 일기 최종 생성 | KoBART fine-tuned 모델(팀 모델 담당 제공) |
 
-하루 줄글 일기 생성 API(KoBART 모델)
+---
 
-User 회원가입/로그인
+### 🖥 **백엔드(FastAPI)**
 
-PostgreSQL 저장
+* 사진 업로드 API
+* 한 줄 일기 생성 API
+* 하루 줄글 일기 생성 API (GPT)
+* 하루 줄글 일기 생성 API (KoBART fine-tuned 모델)
+* User 회원가입/로그인
+* PostgreSQL 저장
+* AWS EC2 배포
 
-AWS EC2 배포
+---
 
-📱 프론트(Android)
+### 📱 **프론트엔드(Android)**
 
-Jetpack Compose UI
+* Jetpack Compose UI
+* 사진 업로드 화면
+* 생성된 일기 리스트
+* Calendar 기반 일기 기록
+* 마이페이지
+* Retrofit 기반 서버 통신
 
-사진 업로드
+---
 
-생성된 일기 보기
+## 📦 **모델 다운로드 안내**
 
-Calendar 기반 일기 리스트
+학습된 KoBART 모델은 용량 때문에 GitHub에 포함되지 않음.
+아래 드라이브에서 다운로드:
 
-마이페이지
+👉 [https://drive.google.com/drive/folders/1bZPq1JaPhUTS6As8tW0tvMUuIcHYiIXl](https://drive.google.com/drive/folders/1bZPq1JaPhUTS6As8tW0tvMUuIcHYiIXl)
 
-Retrofit 통신
+다운로드 후 복사 경로:
 
-🚀 실행 방법
-🔹 백엔드
+```
+backend/models/day_diary_from_summary_v2/
+```
+
+---
+
+## 🚀 **백엔드 실행 방법**
+
+```bash
 cd backend
 python3 -m venv venv
-source venv/bin/activate  # Windows는 venv\Scripts\activate
+source venv/bin/activate     # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
 
+Swagger → [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
-문서 보기 →
-http://127.0.0.1:8000/docs
+---
 
-🔹 Android 앱 실행
+## ▶️ **프론트 실행 방법**
+
+```
 Android Studio → Open → frontend/Android
-에뮬레이터 선택 → Run
+에뮬레이터 실행 → Run
+```
 
-🔹 모델 배치(Google Drive 다운로드)
+---
 
-Google Drive 모델 다운로드 링크:
-👉 https://drive.google.com/drive/folders/1bZPq1JaPhUTS6As8tW0tvMUuIcHYiIXl
+## 👥 **Contributors**
 
-다운로드 후 아래 위치에 저장:
+| 역할       | 담당      |
+| -------- | ------- |
+| 백엔드      | 윤수빈 , 임규민 |
+| 프론트엔드    | 도한비 |
+| AI Model | 류혁, 정성경 |
 
-backend/models/day_diary_from_summary_v2/
+---
 
-👥 Contributors
-역할	담당
-백엔드	윤수빈
-프론트엔드	팀원
-AI 모델	팀 모델 담당
+
