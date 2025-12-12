@@ -6,7 +6,6 @@ import android.widget.Toast
 import androidx.annotation.RequiresApi
 import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -40,6 +39,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import androidx.compose.ui.res.painterResource
+import coil.compose.AsyncImagePainter
 
 private val White = Color(0xFFFFFFFF)
 
@@ -97,10 +98,10 @@ fun CardDiaryScreen(
                     val fixedUrl = if (it.image_url.startsWith("http")) {
                         it.image_url
                     } else {
-                        val baseUrl = "http://15.164.215.237:8000"
+                        val baseUrl = "http://3.35.185.251:8000"
                         "$baseUrl${it.image_url}"
                     }
-                    
+
                     Log.d("DIARY_DEBUG", "원본: ${it.image_url} -> 수정후: $fixedUrl")
 
                     DiaryPhoto(fixedUrl, it.content)
@@ -243,26 +244,36 @@ fun FrontSideContent(
             HorizontalPager(state = pagerState) { page ->
                 // Coil 라이브러리로 URL 이미지 로드
                 AsyncImage(
-                    model = diaryPhotos[page].imageUrl, // URL 사용
+                    model = diaryPhotos[page].imageUrl,
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize(),
+
+                    // [1] 화면에 보여줄 이미지 설정 (버전 2 파라미터)
+                    error = painterResource(id = android.R.drawable.ic_menu_report_image),
+                    placeholder = painterResource(id = android.R.drawable.ic_menu_gallery),
+
+                    // [2] onState 대신 onError 사용 (버전 2 파라미터)
+                    onError = { state ->
+                        // state가 이미 Error 타입이므로 타입 체크 불필요
+                        Log.e("CoilError", "이미지 로드 실패: ${state.result.throwable.message}")
+                    }
                 )
             }
-            
+
             if (pagerState.currentPage > 0) {
                 IconButton(
                     onClick = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
-                    modifier = Modifier.align(Alignment.CenterStart).padding(8.dp).background(White.copy(0.7f), 
+                    modifier = Modifier.align(Alignment.CenterStart).padding(8.dp).background(White.copy(0.7f),
                         CircleShape)
                 ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = DarkGray) }
             }
             if (pagerState.currentPage < diaryPhotos.size - 1) {
                 IconButton(
                     onClick = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(8.dp).background(White.copy(0.7f), 
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(8.dp).background(White.copy(0.7f),
                         CircleShape)
-                ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, 
+                ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     null, tint = DarkGray) }
             }
         }
