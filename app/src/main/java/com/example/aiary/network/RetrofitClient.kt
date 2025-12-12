@@ -11,11 +11,9 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
 
 
-// 2. 통신 기계 (RetrofitClient) - 설정이 완벽하여 그대로 유지합니다.
+// 통신 기계 (RetrofitClient)
 object RetrofitClient {
-    // AWS EC2 주소 (끝에 / 필수)
-    private const val BASE_URL = "http://43.200.66.182:8000/"
-
+    private const val BASE_URL = "http://13.124.163.80:8000/"
     // 로그캣에서 통신 내용을 보기 위한 설정
     private val logging = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
@@ -35,3 +33,4 @@ object RetrofitClient {
             .create(ApiService::class.java)
     }
 }
+
