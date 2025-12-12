@@ -85,7 +85,7 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val context = LocalContext.current
-    val logoFontFamily = FontFamily(Font(R.font.jalnan)) // 폰트 파일이 있는지 확인 필요
+    val logoFontFamily = FontFamily(Font(R.font.jalnan)) 
     val coroutineScope = rememberCoroutineScope()
 
     Column(
@@ -101,10 +101,10 @@ fun LoginScreen(
             painter = painterResource(id = R.drawable.aiary_logo),
             contentDescription = "AIary Logo",
             modifier = Modifier
-                .width(200.dp) // 로고의 가로 너비
-                // .height(100.dp) // 필요하면 높이도 지정 가능
+                .width(200.dp) 
+                // .height(100.dp)
                 .padding(bottom = 16.dp),
-            contentScale = ContentScale.Fit // 이미지 비율 유지하며 맞춤
+            contentScale = ContentScale.Fit 
         )
 
         Text(
@@ -114,7 +114,7 @@ fun LoginScreen(
             modifier = Modifier.padding(bottom = 48.dp)
         )
 
-        // --- 입력 필드 ---
+        // 입력 필드
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
@@ -167,7 +167,7 @@ fun LoginScreen(
                             val accessToken = body?.access_token
 
                             if (accessToken != null) {
-                                // ⭐ JWT 토큰에서 user_id 추출하기
+                                // JWT 토큰에서 user_id 추출하기
                                 val userId = getUserIdFromToken(accessToken)
                                 UserSession.userId = userId
                                 UserSession.userEmail = email  // 입력했던 이메일 저장
@@ -201,7 +201,7 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // --- 하단 버튼들 ---
+        // 하단 버튼들
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
