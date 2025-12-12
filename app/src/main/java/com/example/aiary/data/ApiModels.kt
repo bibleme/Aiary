@@ -63,11 +63,11 @@ data class ChangePasswordRequest(
     val new_password: String
 )
 
-// [GET] /diaries/?user_id={id} 응답 결과 (일기 목록 아이템)
+
 data class DiaryResponse(
     val id: Int,
     val user_id: Int,
-    val content: String,    // 한 줄 일기 내용
-    val image_url: String,  // S3 등 서버에 저장된 이미지 주소
-    val created_at: String  // "2025-12-10T10:00:00" 형태의 날짜
+    val content: String,
+    val image_url: String,
+    val created_at: String
 )
