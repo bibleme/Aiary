@@ -163,10 +163,10 @@ fun MyPageScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    GenderButton("왕자님 👑", babyGender == "남아", { babyGender = "남아" }, 
+                    GenderButton("왕자님 👑", babyGender == "남아", { babyGender = "남아" },
                         Modifier.weight(1f))
                     Spacer(modifier = Modifier.width(8.dp))
-                    GenderButton("공주님 🎀", babyGender == "여아", { babyGender = "여아" }, 
+                    GenderButton("공주님 🎀", babyGender == "여아", { babyGender = "여아" },
                         Modifier.weight(1f))
                 }
 
@@ -187,9 +187,9 @@ fun MyPageScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text("계정 설정", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Gray, 
+        Text("계정 설정", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Gray,
             modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp))
-        Card(colors = CardDefaults.cardColors(containerColor = White), shape = RoundedCornerShape(12.dp), 
+        Card(colors = CardDefaults.cardColors(containerColor = White), shape = RoundedCornerShape(12.dp),
             modifier = Modifier.fillMaxWidth()) {
             Column {
                 SettingItem(title = "이메일 정보", value = UserSession.userEmail ?: "이메일 없음")
@@ -203,7 +203,7 @@ fun MyPageScreen(
     }
 
     if (showPasswordDialog){
-        ChangePasswordDialog(onDismiss = { showPasswordDialog = false }, onConfirm = { 
+        ChangePasswordDialog(onDismiss = { showPasswordDialog = false }, onConfirm = {
             c, n -> viewModel.changePassword(context, c, n); showPasswordDialog = false })
     }
 }
