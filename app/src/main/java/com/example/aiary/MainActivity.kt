@@ -98,11 +98,11 @@ fun LoginScreen(
     ) {
         // 로고
         Image(
-            painter = painterResource(id = R.drawable._aiary_appicon),
+            painter = painterResource(id = R.drawable.aiary_logo),
             contentDescription = "AIary Logo",
             modifier = Modifier
-                .width(200.dp) // 로고의 가로 너비 
-                // .height(100.dp) // 필요하면 높이도 지정 가능 
+                .width(200.dp) // 로고의 가로 너비
+                // .height(100.dp) // 필요하면 높이도 지정 가능
                 .padding(bottom = 16.dp),
             contentScale = ContentScale.Fit // 이미지 비율 유지하며 맞춤
         )
