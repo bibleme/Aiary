@@ -50,7 +50,9 @@ data class DaySummaryRequest(
 // 7. 하루 줄글 일기 응답
 data class FullDiaryResponse(
     val status: String,
-    val summary: String, // KoBART가 만든 줄글 일기
+    // 서버 -> "generated_diary", 앱 변수명(summary)과 연결
+    @SerializedName("generated_diary")
+    val summary: String?,
     val bullet_lines: List<String>?,
     val combined_summary: String?
 )
