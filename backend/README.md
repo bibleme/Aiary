@@ -117,6 +117,4 @@ Google Drive 모델 다운로드 →
 backend/models/day_diary_from_summary_v2/
 ```
 
----
 
----
