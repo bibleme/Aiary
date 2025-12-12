@@ -1,55 +1,122 @@
- Aiary Backend (FastAPI)
 
-FastAPI 기반으로 작성된 Aiary의 서버 애플리케이션입니다.
+---
 
-📂 Backend 구조
+# 📡 **Aiary Backend – FastAPI 서비스**
+
+이 서버는 **사진 업로드 → AI 한 줄 일기 생성 → DB 저장 → 하루 요약 줄글 생성 → KoBART 줄글 일기 생성**의 모든 백엔드 로직을 담당합니다.
+
+---
+
+## 📂 폴더 구조
+
+```
 backend/
 │
 ├── app/
-│   ├── api/endpoints/        # diary, user 관련 API 라우터
-│   ├── db/                   # DB model / 연결
-│   ├── schemas/              # Pydantic 요청/응답 모델
-│   ├── services/             # GPT·KoBART 호출 / 일기 생성 로직
-│   └── config.py             # 환경 변수 로딩
+│   ├── api/endpoints/
+│   │   ├── user.py
+│   │   ├── diary.py
+│   ├── db/
+│   │   ├── database.py
+│   │   ├── model.py
+│   ├── services/
+│       ├── ai_generator.py             # GPT Vision + 요약
+│       ├── daily_diary_generator.py    # KoBART 줄글 일기 모델
 │
-├── media/images/             # 업로드된 이미지 저장
-├── models/                   # (실행용) 모델 가중치 폴더 (별도 다운로드)
+├── media/images/                       # 업로드 이미지 저장
 │
-├── .env.example              # 환경 변수 템플릿
-├── Dockerfile
+├── models/                             # KoBART 모델 위치
+│
 ├── create_tables.py
-└── main.py                   # 서버 시작점
+├── requirements.txt
+├── .env.example
+└── main.py
+```
 
- 환경변수(.env 설정)
+---
 
-프로젝트 루트에 아래와 같은 .env 파일이 필요합니다:
+## 🔐 환경 변수(.env)
 
+`.env.example`을 복사하여 `.env`를 생성:
+
+```
 OPENAI_API_KEY=YOUR_KEY
-DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/aiary_db
+DATABASE_URL=postgresql+asyncpg://aiary_user:aiary_pass@localhost:5432/aiary_db
+```
 
+---
 
-.env.example 참고하면 됩니다.
+## 🚀 서버 실행
 
- .env는 절대 Git에 올리지 않습니다.
-
- 백엔드 실행 방법
+```bash
 cd backend
-python -m venv venv
-venv\Scripts\activate       # Windows
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
-uvicorn main:app --reload
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
 
+Swagger 문서 → [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 
-Swagger 문서:
- http://127.0.0.1:8000/docs
+---
 
- AI 모델 경로
+## 🎯 제공 API 요약
 
-FastAPI는 내부에서 다음 경로로부터 모델을 사용합니다:
+### 📌 1) 사진 업로드 + 한 줄 일기 생성
 
+```
+POST /diaries/
+form-data:
+  user_id: int
+  photo: 이미지 파일
+```
+
+GPT Vision → 한 줄 일기 생성 후 DB 저장
+
+---
+
+### 📌 2) 유저별 일기 리스트
+
+```
+GET /diaries/?user_id=1
+```
+
+---
+
+### 📌 3) 하루 줄글 요약(GPT 기반)
+
+```
+POST /diaries/summary
+```
+
+---
+
+### 📌 4) 하루 줄글 요약(JSON 버전)
+
+```
+POST /diaries/summary-json
+```
+
+---
+
+### 📌 5) 줄글 일기 생성(KoBART 학습 모델)
+
+`daily_diary_generator.py` 내부에서 호출됨.
+`summary_text` → 모델 입력 → 줄글 일기 생성.
+
+---
+
+## 🤖 KoBART 모델 배치
+
+Google Drive 모델 다운로드 →
+👉 [https://drive.google.com/drive/folders/1bZPq1JaPhUTS6As8tW0tvMUuIcHYiIXl](https://drive.google.com/drive/folders/1bZPq1JaPhUTS6As8tW0tvMUuIcHYiIXl)
+
+아래에 저장:
+
+```
 backend/models/day_diary_from_summary_v2/
-backend/models/one_line_diary/
+```
 
+---
 
-모델 파일들은 GitHub에 포함되어 있지 않고,
-models/README.md 안내에 따라 다운로드 후 위 경로에 넣어야 합니다.
+---
