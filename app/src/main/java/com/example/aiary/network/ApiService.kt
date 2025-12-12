@@ -29,7 +29,6 @@ interface ApiService {
     @Multipart
     @POST("diaries/")
     suspend fun createDiary(
-        // 🚨 백엔드는 'user_id'를 원함 (기존 baby_id에서 수정됨!)
         @Part("user_id") userId: RequestBody,
         @Part photo: MultipartBody.Part
     ): Response<CreateDiaryResponse>
