@@ -96,7 +96,8 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                 // 테두리 점선
                 val stroke = Stroke(width = 5f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(20f, 20f), 0f))
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawRoundRect(color = Color(0xFFa7c5eb), style = stroke, cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx()))
+                    drawRoundRect(color = Color(0xFFa7c5eb), style = stroke,
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx()))
                 }
 
                 // 내용물: 사진 선택 여부에 따라 다르게 보여줌
@@ -226,7 +227,7 @@ fun ImageUploadScreenPreview() {
     ImageUploadScreen(onBack = {})
 }
 
-// Context를 이용해서 Uri -> 실제 파일로 변환하는 함수 (그대로 유지)
+// Context를 이용해서 Uri -> 실제 파일로 변환하는 함수
 fun getFileFromUri(context: android.content.Context, uri: android.net.Uri): java.io.File? {
     val inputStream = context.contentResolver.openInputStream(uri) ?: return null
     val tempFile = java.io.File.createTempFile("upload", ".jpg", context.cacheDir)
@@ -234,4 +235,4 @@ fun getFileFromUri(context: android.content.Context, uri: android.net.Uri): java
         inputStream.copyTo(output)
     }
     return tempFile
-} // 251210 수정
+}
