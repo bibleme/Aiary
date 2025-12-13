@@ -92,7 +92,7 @@ fun CardDiaryScreen(
                     serverDate == targetDate
                 }
 
-                // UI용 데이터로 변환 
+                // UI용 데이터로 변환 (이미지 주소 고치기!)
                 diaryPhotos = filteredDiaries.map {
 
                     val fixedUrl = if (it.image_url.startsWith("http")) {
@@ -107,7 +107,7 @@ fun CardDiaryScreen(
                     DiaryPhoto(fixedUrl, it.content)
                 }
 
-                // 사진이 있다면 줄글 요약 일기도 가져오기
+                // 사진이 있다면, 줄글 요약 일기도 가져오기
                 if (filteredDiaries.isNotEmpty()) {
                     Log.d("DIARY_DEBUG", "줄글 일기 요청 시작: ID=$myId, Date=$targetDate")
 
@@ -116,9 +116,9 @@ fun CardDiaryScreen(
 
                     if (summaryResponse.isSuccessful) {
                         val result = summaryResponse.body()
-                        Log.d("DIARY_DEBUG", "줄글 일기 응답 성공: ${result?.summary}")
+                        Log.d("DIARY_DEBUG", "줄글 일기 응답 성공: ${result?.full_diary}")
 
-                        fullDiaryText = result?.summary ?: "서버에서 빈 내용을 보냈습니다."
+                        fullDiaryText = result?.full_diary ?: "서버에서 빈 내용을 보냈습니다."
                     } else {
                         // 실패 원인을 로그에 출력
                         val errorMsg = summaryResponse.errorBody()?.string()
@@ -314,14 +314,24 @@ fun BackSideContent(fullDiaryText: String) {
 
 // 날짜 변환 헬퍼 함수
 @RequiresApi(Build.VERSION_CODES.O)
-fun convertKoreanDateToIso(koreanDate: String): String {
-    return try {
-        val simpleDate = koreanDate.split(" ").take(3).joinToString(" ")
-        val formatter = DateTimeFormatter.ofPattern("yyyy년 M월 d일")
-        val date = LocalDate.parse(simpleDate, formatter)
-        date.toString() // "2025-12-10"
+fun convertKoreanDateToIso(inputDate: String): String {
+    try {
+        // 1. 문자열에서 숫자만 싹 추출 (예: "2025년 12월 12일" -> [2025, 12, 12])
+        val numbers = Regex("\\d+").findAll(inputDate).map { it.value.toInt() }.toList()
+
+        // 2. 연, 월, 일이 모두 있으면 포맷팅
+        if (numbers.size >= 3) {
+            val year = numbers[0]
+            val month = numbers[1]
+            val day = numbers[2]
+            // %02d : 숫자 앞에 0을 붙여 두 자리로 만듦 (예: 9 -> 09)
+            // 결과: "2025-12-12"
+            return String.format("%04d-%02d-%02d", year, month, day)
+        }
     } catch (e: Exception) {
-        // 파싱 실패 시 오늘 날짜 반환하거나 에러 처리
-        LocalDate.now().toString()
+        Log.e("DateConvert", "날짜 변환 실패", e)
     }
+
+    // 실패 시 오늘 날짜 반환 (안전장치)
+    return LocalDate.now().toString()
 }
