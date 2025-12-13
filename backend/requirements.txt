@@ -1,0 +1,45 @@
+annotated-doc==0.0.4
+annotated-types==0.7.0
+anyio==4.12.0
+click==8.3.1
+fastapi==0.123.5
+greenlet==3.2.4
+h11==0.16.0
+httptools==0.7.1
+idna==3.11
+pydantic==2.12.5
+pydantic_core==2.41.5
+python-dotenv==1.2.1
+python-multipart==0.0.20
+PyYAML==6.0.3
+SQLAlchemy==2.0.44
+starlette==0.50.0
+typing-inspection==0.4.2
+typing_extensions==4.15.0
+uvicorn==0.38.0
+# uvloop==0.22.1
+watchfiles==1.1.1
+websockets==15.0.1
+
+#줄글일기 때문에 추가로 필요한 것들
+transformers>=4.36.0,<5
+sentencepiece
+accelerate
+emoji
+regex
+pandas
+torch     # (이미 있으면 생략)
+
+
+# -------------------- AI, Vision, and Image Handling --------------------
+openai
+Pillow
+
+# -------------------- Security, Auth, and DB Drivers --------------------
+psycopg2-binary
+passlib[bcrypt]           # 비밀번호를 암호화하는 도구
+bcrypt==4.0.1
+python-jose[cryptography]
+asyncpg
+email-validator
+pydantic-settings

@@ -1,0 +1,60 @@
+# -------------------- Virtual Environment --------------------
+# 가상 환경 폴더는 용량이 크고 OS마다 다르므로 무시
+venv/
+
+# -------------------- System/Python Artifacts --------------------
+# 컴파일된 파이썬 파일, 캐시 파일 무시
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# -------------------- OS & IDE Artifacts --------------------
+.DS_Store
+.vscode/
+
+# -------------------- Configuration & Logs --------------------
+# 민감 정보 및 로그 파일 무시 (절대 필수!)
+.env
+.env.local
+*.log
+*.sqlite  # SQLite DB 파일을 쓰는 경우 무시
+/uploads/ # 로컬에 저장되는 사진 파일을 무시 (S3에 저장된 URL만 DB에 기록됨)
+
+# -------------------- Docker --------------------
+# Docker의 로컬 빌드 파일 및 캐시 무시
+.dockerignore
+
+# -------------------- Private -------------------
+Aiary.pem
+
+
+# ==== ML model weights (too large for GitHub) ====
+models/day_diary_from_summary_v2/
+*.safetensors
+*.pt
+*.bin
+*.ckpt
+
+
+# ---------- Android / Frontend ----------
+frontend/Android/.idea/
+*.iml
+.gradle/
+local.properties
+captures/
+build/
+app/build/
+
+# ---------- Backend uploads (이미지 등 테스트 파일) ----------
+backend/media/images/
+
+# ---------- Keys / Private files ----------
+backend/new_aiary_key
+backend/new_aiary_key.pub
+Aiary.pem
+# Keys / private files
+backend/new_aiary_key
+backend/new_aiary_key.pub
+*aiary_key*
+*.pem
+*.pub
