@@ -1,3 +1,5 @@
+![Aiary Logo](https://github.com/bibleme/Aiary/raw/main/logo.png)
+
 # 🌿 **Aiary – AI 기반 사진 자동 일기 생성 서비스**
 
 Aiary는 **아기의 사진을 올리면 자동으로 한 줄 일기와 하루 줄글 일기**를 생성해주는 AI 서비스입니다.
@@ -98,6 +100,9 @@ Android Studio → Open → frontend/Android
 ```
 
 ---
+
+## 📺 Demo
+![Aiary Demo](https://github.com/bibleme/Aiary/raw/main/demo.gif)
 
 ## 👥 **Contributors**
 
