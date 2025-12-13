@@ -1,8 +1,14 @@
 package com.example.aiary
 
+import android.app.Activity
 import android.app.DatePickerDialog
+import android.content.Intent
+import android.net.Uri
+import android.provider.MediaStore
 import android.widget.DatePicker
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -27,35 +33,51 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.aiary.data.ChangePasswordRequest
-import com.example.aiary.network.RetrofitClient
+import coil.compose.AsyncImage
+import com.example.aiary.data.UserSession
 import java.util.Calendar
-import kotlinx.coroutines.launch
 import androidx.lifecycle.viewmodel.compose.viewModel
 
 private val White = Color(0xFFFFFFFF)
 
 @Composable
-fun MyPageScreen(onLogout: () -> Unit,
-                 viewModel: MypageViewModel = viewModel()) {
-    // 상태 변수들 (나중엔 서버에서 받아온 값으로 초기화해야 함)
-    var babyName by remember { mutableStateOf("시우") }
-    var babyBirthDate by remember { mutableStateOf("2024-01-01") }
-    var babyGender by remember { mutableStateOf("남아") } // "남아" or "여아"
+fun MyPageScreen(
+    onLogout: () -> Unit,
+    viewModel: MypageViewModel = viewModel(),
+    currentBabyName: String,
+    currentBabyBirthDate: String,
+    currentProfileUri: Uri?,
+    onUpdateProfile: (String, String) -> Unit,
+    onUpdateProfileImage: (Uri) -> Unit
+) {
+    var babyName by remember { mutableStateOf(currentBabyName) }
+    var babyBirthDate by remember { mutableStateOf(currentBabyBirthDate) }
+    var babyGender by remember { mutableStateOf("남아") }
 
     val context = LocalContext.current
     val scrollState = rememberScrollState()
-    val coroutineScope = rememberCoroutineScope()
 
-    // 달력 팝업 (DatePickerDialog)
+    // 갤러리 앱을 직접 실행
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val uri = result.data?.data
+            if (uri != null) {
+                onUpdateProfileImage(uri)
+            }
+        }
+    }
+
     val calendar = Calendar.getInstance()
     val datePickerDialog = DatePickerDialog(
         context,
         { _: DatePicker, year: Int, month: Int, dayOfMonth: Int ->
-            // 월은 0부터 시작하므로 +1 해줌
-            babyBirthDate = "$year-${month + 1}-$dayOfMonth"
+            val formattedMonth = String.format("%02d", month + 1)
+            val formattedDay = String.format("%02d", dayOfMonth)
+            babyBirthDate = "$year-$formattedMonth-$formattedDay"
         },
-        2024, 0, 1 // 기본 시작 날짜
+        2024, 0, 1
     )
     var showPasswordDialog by remember { mutableStateOf(false) }
 
@@ -67,122 +89,96 @@ fun MyPageScreen(onLogout: () -> Unit,
             .verticalScroll(scrollState),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 상단 타이틀
-        Text(
-            text = "마이페이지",
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = DarkGray,
-            modifier = Modifier.padding(top = 16.dp, bottom = 32.dp)
-        )
+        Text("마이페이지", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = DarkGray, modifier = Modifier.padding(top = 16.dp, bottom = 32.dp))
 
-        // 아이 프로필 카드 (수정 가능 영역)
         Card(
             colors = CardDefaults.cardColors(containerColor = White),
             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
             shape = RoundedCornerShape(16.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Column(
-                modifier = Modifier.padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // 프로필 사진 (원형)
+            Column(modifier = Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+
+                // 프로필 사진 영역
                 Box(
                     contentAlignment = Alignment.BottomEnd,
-                    modifier = Modifier.size(100.dp)
+                    modifier = Modifier
+                        .size(100.dp)
+                        .clickable {
+                            // 갤러리 앱(MediaStore)을 호출하는 Intent 실행
+                            val intent = Intent(Intent.ACTION_PICK, MediaStore.Images.Media.EXTERNAL_CONTENT_URI)
+                            imagePickerLauncher.launch(intent)
+                        }
                 ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.baby_icon), // 기본 이미지
-                        contentDescription = "프로필 사진",
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(CircleShape)
-                            .border(2.dp, PrimaryBlue, CircleShape)
-                    )
-                    // 수정 아이콘
-                    Box(
-                        modifier = Modifier
-                            .size(30.dp)
-                            .background(DarkGray, CircleShape)
-                            .padding(6.dp)
-                    ) {
+                    if (currentProfileUri != null) {
+                        AsyncImage(
+                            model = currentProfileUri,
+                            contentDescription = "프로필 사진",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                                .border(2.dp, PrimaryBlue, CircleShape)
+                        )
+                    } else {
+                        Image(
+                            painter = painterResource(id = R.drawable.baby_icon),
+                            contentDescription = "기본 프로필",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .clip(CircleShape)
+                                .border(2.dp, PrimaryBlue, CircleShape)
+                        )
+                    }
+
+                    Box(modifier = Modifier.size(30.dp).background(DarkGray, CircleShape).padding(6.dp)) {
                         Icon(Icons.Default.Edit, contentDescription = "수정", tint = White)
                     }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // 입력 필드들
-                // 이름 입력
                 OutlinedTextField(
-                    value = babyName,
-                    onValueChange = { babyName = it },
-                    label = { Text("아이 이름(태명)") },
-                    singleLine = true,
+                    value = babyName, onValueChange = { babyName = it },
+                    label = { Text("아이 이름(태명)") }, singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryBlue,
-                        unfocusedBorderColor = Color.LightGray
-                    )
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PrimaryBlue, unfocusedBorderColor = Color.LightGray)
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 생년월일 선택 (클릭하면 달력 뜸)
                 OutlinedTextField(
-                    value = babyBirthDate,
-                    onValueChange = {},
-                    label = { Text("생년월일") },
+                    value = babyBirthDate, onValueChange = {}, label = { Text("생년월일") },
                     readOnly = true,
                     trailingIcon = {
                         IconButton(onClick = { datePickerDialog.show() }) {
-                            Icon(
-                                painterResource(android.R.drawable.ic_menu_my_calendar),
-                                contentDescription = "달력"
-                            )
+                            Icon(painterResource(android.R.drawable.ic_menu_my_calendar), contentDescription = "달력")
                         }
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { datePickerDialog.show() }, // 텍스트 필드 눌러도 달력 뜸
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryBlue,
-                        unfocusedBorderColor = Color.LightGray
-                    )
+                    modifier = Modifier.fillMaxWidth().clickable { datePickerDialog.show() },
+                    colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = PrimaryBlue, unfocusedBorderColor = Color.LightGray)
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 성별 선택 (버튼 2개)
                 Row(modifier = Modifier.fillMaxWidth()) {
-                    GenderButton(
-                        text = "왕자님 👑",
-                        isSelected = babyGender == "남아",
-                        onClick = { babyGender = "남아" },
-                        modifier = Modifier.weight(1f)
-                    )
+                    GenderButton("왕자님 👑", babyGender == "남아", { babyGender = "남아" },
+                        Modifier.weight(1f))
                     Spacer(modifier = Modifier.width(8.dp))
-                    GenderButton(
-                        text = "공주님 🎀",
-                        isSelected = babyGender == "여아",
-                        onClick = { babyGender = "여아" },
-                        modifier = Modifier.weight(1f)
-                    )
+                    GenderButton("공주님 🎀", babyGender == "여아", { babyGender = "여아" },
+                        Modifier.weight(1f))
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // 저장 버튼
                 Button(
                     onClick = {
-                        // TODO: 여기서 백엔드로 수정된 정보를 보내야 함 (PUT /users/profile)
+                        onUpdateProfile(babyName, babyBirthDate)
                         Toast.makeText(context, "정보가 수정되었습니다!", Toast.LENGTH_SHORT).show()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-                    modifier = Modifier.fillMaxWidth().height(50.dp),
-                    shape = RoundedCornerShape(12.dp)
+                    modifier = Modifier.fillMaxWidth().height(50.dp), shape = RoundedCornerShape(12.dp)
                 ) {
                     Text("저장하기", fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 }
@@ -191,47 +187,27 @@ fun MyPageScreen(onLogout: () -> Unit,
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // 계정 설정
-        Text(
-            text = "계정 설정",
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color.Gray,
-            modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp)
-        )
-
-        Card(
-            colors = CardDefaults.cardColors(containerColor = White),
-            shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        Text("계정 설정", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Gray,
+            modifier = Modifier.align(Alignment.Start).padding(bottom = 8.dp))
+        Card(colors = CardDefaults.cardColors(containerColor = White), shape = RoundedCornerShape(12.dp),
+            modifier = Modifier.fillMaxWidth()) {
             Column {
-                SettingItem(title = "이메일 정보", value = "aiary@naver.com") // 로그인된 이메일 표시
+                SettingItem(title = "이메일 정보", value = UserSession.userEmail ?: "이메일 없음")
                 HorizontalDivider(color = BackgroundBeige)
                 SettingItem(title = "비밀번호 변경", isArrow = true, onClick = { showPasswordDialog = true })
                 HorizontalDivider(color = BackgroundBeige)
                 SettingItem(title = "로그아웃", isArrow = true, onClick = onLogout, textColor = Color.Red)
             }
         }
-
-        Spacer(modifier = Modifier.height(50.dp)) // 하단 여백
-
+        Spacer(modifier = Modifier.height(50.dp))
     }
-    if (showPasswordDialog){
-        ChangePasswordDialog(
-            onDismiss = { showPasswordDialog = false },
-            onConfirm = { currentPw, newPw ->
-                // 복잡한 코드는 다 지우고, 딱 이 한 줄로 끝냅니다!
-                viewModel.changePassword(context, currentPw, newPw)
 
-                // 다이얼로그 닫기
-                showPasswordDialog = false
-            }
-        )
+    if (showPasswordDialog){
+        ChangePasswordDialog(onDismiss = { showPasswordDialog = false }, onConfirm = {
+            c, n -> viewModel.changePassword(context, c, n); showPasswordDialog = false })
     }
 }
 
-// --- 보조 컴포저블 함수들 ---
 
 @Composable
 fun GenderButton(
@@ -294,10 +270,8 @@ fun ChangePasswordDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        containerColor = Color.White, // 배경색 흰색
-        title = {
-            Text(text = "비밀번호 변경", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        },
+        containerColor = Color.White,
+        title = { Text(text = "비밀번호 변경", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
         text = {
             Column {
                 OutlinedTextField(
@@ -305,14 +279,7 @@ fun ChangePasswordDialog(
                     onValueChange = { currentPassword = it },
                     label = { Text("현재 비밀번호") },
                     singleLine = true,
-                    // 비밀번호 가리기 설정
                     visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        focusedBorderColor = PrimaryBlue,
-                        unfocusedBorderColor = Color.LightGray
-                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -322,12 +289,6 @@ fun ChangePasswordDialog(
                     label = { Text("새 비밀번호 (6자리 이상)") },
                     singleLine = true,
                     visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        focusedBorderColor = PrimaryBlue,
-                        unfocusedBorderColor = Color.LightGray
-                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -337,16 +298,8 @@ fun ChangePasswordDialog(
                     label = { Text("새 비밀번호 확인") },
                     singleLine = true,
                     visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedContainerColor = Color.White,
-                        unfocusedContainerColor = Color.White,
-                        focusedBorderColor = PrimaryBlue,
-                        unfocusedBorderColor = Color.LightGray
-                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
-
-                // 에러 메시지 표시
                 if (errorMessage.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(text = errorMessage, color = Color.Red, fontSize = 12.sp)
@@ -356,7 +309,6 @@ fun ChangePasswordDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    // 유효성 검사
                     if (currentPassword.isEmpty() || newPassword.isEmpty()) {
                         errorMessage = "모든 항목을 입력해주세요."
                     } else if (newPassword.length < 6) {
@@ -364,7 +316,6 @@ fun ChangePasswordDialog(
                     } else if (newPassword != confirmNewPassword) {
                         errorMessage = "새 비밀번호가 일치하지 않습니다."
                     } else {
-                        // 검사 통과 시
                         onConfirm(currentPassword, newPassword)
                     }
                 },
@@ -375,9 +326,7 @@ fun ChangePasswordDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("취소", color = Color.Gray)
-            }
+            TextButton(onClick = onDismiss) { Text("취소", color = Color.Gray) }
         },
         shape = RoundedCornerShape(16.dp)
     )

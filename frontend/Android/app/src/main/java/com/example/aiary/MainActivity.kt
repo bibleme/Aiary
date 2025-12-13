@@ -30,12 +30,15 @@ import androidx.compose.ui.unit.sp
 import com.example.aiary.network.RetrofitClient
 import com.example.aiary.ui.theme.AiaryLoginTheme
 import kotlinx.coroutines.launch
-import androidx.compose.ui.platform.LocalContext
+import android.util.Base64
+import com.example.aiary.data.UserSession
+import org.json.JSONObject
+import androidx.compose.ui.layout.ContentScale
 
 // 색상 정의
-val PrimaryBlue = Color(0xFFa7c5eb)
+val PrimaryBlue = Color(0xFF87CEFA)
 val DarkGray = Color(0xFF333333)
-val BackgroundBeige = Color(0xFFFDF5E6)
+val BackgroundBeige = Color(0xFFFFF99E)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -93,22 +96,17 @@ fun LoginScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        // --- 로고 영역 ---
+        // 로고
         Image(
-            painter = painterResource(id = R.drawable.baby_icon),
+            painter = painterResource(id = R.drawable.aiary_logo),
             contentDescription = "AIary Logo",
             modifier = Modifier
-                .size(100.dp)
-                .padding(bottom = 8.dp)
+                .width(200.dp) // 로고의 가로 너비
+                // .height(100.dp) // 필요하면 높이도 지정 가능
+                .padding(bottom = 16.dp),
+            contentScale = ContentScale.Fit // 이미지 비율 유지하며 맞춤
         )
 
-        Text(
-            text = "AIary",
-            fontSize = 36.sp,
-            fontWeight = FontWeight.Black,
-            color = DarkGray,
-            fontFamily = logoFontFamily
-        )
         Text(
             text = "우리아이의 소중한 하루 기록",
             color = Color.Gray,
@@ -151,43 +149,43 @@ fun LoginScreen(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // --- 로그인 버튼 ---
+        // 로그인 버튼
         Button(
             onClick = {
-                // 1. 빈칸 검사
                 if (email.isEmpty() || password.isEmpty()) {
                     Toast.makeText(context, "이메일과 비밀번호를 입력해주세요.", Toast.LENGTH_SHORT).show()
                     return@Button
                 }
 
-                // 2. 서버 로그인 요청
                 coroutineScope.launch {
                     try {
-                        val trimmedEmail = email.trim()
-                        val trimmedPassword = password.trim()
-
-                        val loginRequest = LoginRequest(email = trimmedEmail, password = trimmedPassword) // 1. 포장하기
-                        val response = RetrofitClient.api.login(loginRequest)
+                        val request = LoginRequest(email, password)
+                        val response = RetrofitClient.api.login(request)
 
                         if (response.isSuccessful) {
                             val body = response.body()
-                            val token = body?.accessToken // 서버가 준 토큰 받기
+                            val accessToken = body?.access_token
 
-                            // 성공 메시지
-                            Toast.makeText(context, "로그인 성공!", Toast.LENGTH_SHORT).show()
-                            Log.d("LOGIN", "로그인 성공! User ID: ${body?.user_id}")
-                            // Log.d("LOGIN", "Token: $token") // 로그캣에서 확인용
+                            if (accessToken != null) {
+                                // ⭐ JWT 토큰에서 user_id 추출하기
+                                val userId = getUserIdFromToken(accessToken)
+                                UserSession.userId = userId
+                                UserSession.userEmail = email  // 입력했던 이메일 저장
+                                UserSession.accessToken = accessToken
 
-                            // TODO: 받은 token을 SharedPreferences에 저장하는 로직이 여기에 들어가야 합니다.
+                                Toast.makeText(context, "로그인 성공! (User ID: $userId)", Toast.LENGTH_SHORT).show()
 
-                            onLoginSuccess() // 홈 화면 이동
+                                // TODO: 나중엔 accessToken과 userId를 Preference에 저장해야 함
+
+                                onLoginSuccess() // 홈으로 이동
+                            } else {
+                                Toast.makeText(context, "토큰 응답 오류", Toast.LENGTH_SHORT).show()
+                            }
                         } else {
-                            // 400, 401 에러 등
-                            Toast.makeText(context, "로그인 실패: 아이디/비번을 확인하세요.", Toast.LENGTH_SHORT).show()
-                            Log.e("LOGIN_FAIL", "Code: ${response.code()}, Error: ${response.errorBody()?.string()}")
+                            Toast.makeText(context, "로그인 실패: 정보를 확인하세요.", Toast.LENGTH_SHORT).show()
                         }
                     } catch (e: Exception) {
-                        Toast.makeText(context, "서버 연결 오류: ${e.message}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "오류: ${e.message}", Toast.LENGTH_SHORT).show()
                         e.printStackTrace()
                     }
                 }
@@ -236,3 +234,22 @@ fun LoginScreenPreview() {
         LoginScreen(onLoginSuccess = {}, onSignUpClick = {})
     }
 }
+
+// JWT 토큰 디코딩 함수
+fun getUserIdFromToken(token: String): Int {
+    try {
+        // JWT는 3부분(Header.Body.Signature)으로 나뉨. Body(1번 인덱스)만 필요함.
+        val parts = token.split(".")
+        if (parts.size < 2) return -1
+
+        val payload = String(Base64.decode(parts[1], Base64.URL_SAFE))
+        val json = JSONObject(payload)
+
+        // 백엔드 user.py에서 'sub'에 user.id를 넣었음
+        return json.getString("sub").toInt()
+    } catch (e: Exception) {
+        e.printStackTrace()
+        return -1
+    }
+}
+

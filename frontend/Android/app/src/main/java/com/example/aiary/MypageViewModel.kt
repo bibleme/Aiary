@@ -36,4 +36,7 @@ class MypageViewModel : ViewModel() {
             }
         }
     }
+
+
 }
+

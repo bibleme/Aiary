@@ -1,5 +1,8 @@
 package com.example.aiary.data
 
+import javax.annotation.processing.Generated
+import com.google.gson.annotations.SerializedName
+
 // 1. 로그인 요청
 data class LoginRequest(
     val email: String,
@@ -42,32 +45,33 @@ data class DiaryData(
     val created_at: String
 )
 
-// 6. 하루 줄글 일기(Full Diary) 요청 (백엔드 diary.py: DaySummaryRequest 참고)
+// 하루 줄글 일기(Full Diary) 요청
 data class DaySummaryRequest(
     val user_id: Int,
     val date: String // "YYYY-MM-DD"
 )
 
-// 7. 하루 줄글 일기 응답
+
 data class FullDiaryResponse(
     val status: String,
-    val summary: String, // KoBART가 만든 줄글 일기
+    val full_diary: String?, // KoBART가 만든 줄글 일기
     val bullet_lines: List<String>?,
     val combined_summary: String?
-)
+ )
 
-// ⭐ 6. 비밀번호 변경 요청 (이게 빠져서 오류가 났었습니다!)
+
+// 비밀번호 변경 요청
 data class ChangePasswordRequest(
-    val email: String,      // 누구인지 식별용
+    val email: String,
     val current_password: String,
     val new_password: String
 )
 
-// [GET] /diaries/?user_id={id} 응답 결과 (일기 목록 아이템)
+
 data class DiaryResponse(
     val id: Int,
     val user_id: Int,
-    val content: String,    // 한 줄 일기 내용
-    val image_url: String,  // S3 등 서버에 저장된 이미지 주소
-    val created_at: String  // "2025-12-10T10:00:00" 형태의 날짜
+    val content: String,
+    val image_url: String,
+    val created_at: String
 )

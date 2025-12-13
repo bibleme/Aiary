@@ -30,8 +30,6 @@ import coil.compose.AsyncImage
 import com.example.aiary.data.StoryBookData
 import com.example.aiary.data.StoryEvent
 
-
-// 임시 색상 정의
 val BookCoverGreen = Color(0xFF5F8565)
 val BookInsideBg = Color(0xFFF0F0F0)
 val KeywordBlue = Color(0xFF4A90E2)
@@ -279,6 +277,7 @@ fun BookPictureDialog(
     )
 }
 
+// 나중에 수정
 @Preview(showBackground = true)
 @Composable
 fun BookStoryScreenPreview() {
