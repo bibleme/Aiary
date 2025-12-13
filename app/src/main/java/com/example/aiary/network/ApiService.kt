@@ -34,7 +34,7 @@ interface ApiService {
     ): Response<CreateDiaryResponse>
 
     // 하루 줄글 일기 생성 (KoBART)
-    @POST("diaries/summary-json")
+    @POST("diaries/full")
     suspend fun createFullDiary(
         @Body request: DaySummaryRequest
     ): Response<FullDiaryResponse>
@@ -49,4 +49,5 @@ interface ApiService {
     suspend fun getDiaries(
         @Query("user_id") userId: Int
     ): Response<List<DiaryResponse>>
+
 }
