@@ -98,12 +98,9 @@ Swagger → [(http://3.35.185.251:8000/docs)]
 Android Studio → Open → frontend/Android
 에뮬레이터 실행 → Run
 ```
-
----
-
 ## 📺 Demo
 ![Aiary Demo](https://github.com/bibleme/Aiary/raw/main/demo.gif)
-
+---
 ## 👥 **Contributors**
 
 | 역할       | 담당      |
