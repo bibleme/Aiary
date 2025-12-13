@@ -12,8 +12,8 @@ android {
 
     defaultConfig {
         applicationId = "com.example.aiary_login"
-        minSdk = 24
-        targetSdk = 36
+        minSdk = 26
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
@@ -64,4 +64,7 @@ dependencies {
     // OkHttp Logging Interceptor (통신 내용을 로그창에 찍어주는 도청장치/디버깅 도구)
     // -> 서버랑 무슨 데이터를 주고받았는지 눈으로 볼 수 있음
     implementation("com.squareup.okhttp3:logging-interceptor:4.9.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.0")
+    implementation("io.coil-kt:coil-compose:2.4.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
 }
