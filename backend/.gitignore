@@ -52,3 +52,9 @@ backend/media/images/
 backend/new_aiary_key
 backend/new_aiary_key.pub
 Aiary.pem
+# Keys / private files
+backend/new_aiary_key
+backend/new_aiary_key.pub
+*aiary_key*
+*.pem
+*.pub
