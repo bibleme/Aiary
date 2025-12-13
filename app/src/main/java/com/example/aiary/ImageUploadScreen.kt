@@ -42,7 +42,7 @@ fun ImageUploadScreen(onBack: () -> Unit) {
 
     // 사진 선택기
     val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
+        contract = ActivityResultContracts.GetContent()
     ) { uri ->
         selectedImageUri = uri // 선택한 사진의 주소를 변수에 저장
     }
@@ -52,7 +52,7 @@ fun ImageUploadScreen(onBack: () -> Unit) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFFDF5E6))
+                .background(Color(0xFFFFF99E))
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -87,16 +87,18 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                     .background(Color.White, shape = RoundedCornerShape(16.dp))
                     .clickable {
                         // 박스 클릭 시 갤러리 열기
-                        galleryLauncher.launch(
-                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                        )
+                        // galleryLauncher.launch(
+                          //  PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                        galleryLauncher.launch("image/*")
+
+
                     },
                 contentAlignment = Alignment.Center
             ) {
                 // 테두리 점선
                 val stroke = Stroke(width = 5f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(20f, 20f), 0f))
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawRoundRect(color = Color(0xFFa7c5eb), style = stroke,
+                    drawRoundRect(color = Color(0xFF87CEFA), style = stroke,
                         cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx()))
                 }
 
@@ -104,11 +106,11 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                 if (selectedImageUri == null) {
                     // 선택 안 됨: + 아이콘
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(text = "+", fontSize = 50.sp, color = Color(0xFFa7c5eb))
+                        Text(text = "+", fontSize = 50.sp, color = Color(0xFF87CEFA))
                         Text(text = "사진을 선택하거나 드래그하세요", color = Color(0xFF888888), fontSize = 14.sp)
                     }
                 } else {
-                    // 선택 됨: 체크 아이콘과 파일명 표시 (Coil 라이브러리가 없어서 텍스트로 대체)
+                    // 체크 아이콘과 파일명 표시
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
                             imageVector = Icons.Filled.CheckCircle,
@@ -186,7 +188,7 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                     }
                 },
                 enabled = !isLoading, // 로딩 중엔 버튼 비활성화
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFa7c5eb)),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF87CEFA)),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().height(56.dp)
             ) {
@@ -235,4 +237,6 @@ fun getFileFromUri(context: android.content.Context, uri: android.net.Uri): java
         inputStream.copyTo(output)
     }
     return tempFile
+
+
 }
