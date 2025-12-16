@@ -37,6 +37,8 @@ import com.example.aiary.data.StoryBookData
 import com.example.aiary.data.StoryEvent
 import com.example.aiary.data.UserSession
 import com.example.aiary.network.RetrofitClient
+import java.io.File
+import java.io.FileOutputStream
 
 private val White = Color(0xFFFFFFFF)
 
@@ -68,6 +70,7 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
         val uriString = sharedPreferences.getString("baby_photo", null)
         mutableStateOf(if (uriString != null) Uri.parse(uriString) else null)
     }
+
 
     // D-Day 계산 로직
     val (currentDateString, dDayString) = remember(sharedBabyBirthDate) {
@@ -208,14 +211,26 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                                 .putString("baby_birth", newDate)
                                 .apply()
                         },
-                        // 사진 바뀔 때마다 저장소에도 저장!
                         onUpdateProfileImage = { newUri ->
-                            sharedProfileUri = newUri
+                            try {
+                                val inputStream = context.contentResolver.openInputStream(newUri)
+                                val file = File(context.filesDir, "baby_profile.jpg")
+                                val outputStream = FileOutputStream(file)
 
-                            // 영구 저장 (Uri를 문자열로 바꿔서 저장)
-                            sharedPreferences.edit()
-                                .putString("baby_photo", newUri.toString())
-                                .apply()
+                                inputStream?.copyTo(outputStream)
+                                inputStream?.close()
+                                outputStream.close()
+
+                                val savedUri = Uri.fromFile(file)
+
+                                sharedProfileUri = savedUri
+                                sharedPreferences.edit()
+                                    .putString("baby_photo", savedUri.toString())
+                                    .apply()
+
+                            } catch (e: Exception) {
+                                e.printStackTrace() // 복사 실패 시 로그 출력
+                            }
                         }
                     )
                 }
