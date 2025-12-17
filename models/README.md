@@ -35,7 +35,7 @@ backend/models/day_diary_from_summary_v2/
 
 ```
 하루일기_inference.ipynb        # 하루 줄글 일기 추론
-KoBART_synthetic_v2.ipynb       # 팀 모델 담당의 학습 코드
+KoBART_synthetic_v2.ipynb       # 학습 코드
 ```
 
 ---
