@@ -249,11 +249,11 @@ fun FrontSideContent(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
 
-                    // [1] 화면에 보여줄 이미지 설정 (버전 2 파라미터)
+                    // 화면에 보여줄 이미지 설정 (버전 2 파라미터)
                     error = painterResource(id = android.R.drawable.ic_menu_report_image),
                     placeholder = painterResource(id = android.R.drawable.ic_menu_gallery),
 
-                    // [2] onState 대신 onError 사용 (버전 2 파라미터)
+                    // onState 대신 onError 사용 (버전 2 파라미터)
                     onError = { state ->
                         // state가 이미 Error 타입이므로 타입 체크 불필요
                         Log.e("CoilError", "이미지 로드 실패: ${state.result.throwable.message}")
