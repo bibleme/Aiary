@@ -88,7 +88,6 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                     .height(300.dp)
                     .background(Color.White, shape = RoundedCornerShape(16.dp))
                     .clickable {
-                        // 👇 [수정] "모든 이미지(EXTERNAL_CONTENT_URI)"를 가져오는 갤러리 실행 인텐트!
                         val intent = android.content.Intent(
                             android.content.Intent.ACTION_PICK,
                             android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
