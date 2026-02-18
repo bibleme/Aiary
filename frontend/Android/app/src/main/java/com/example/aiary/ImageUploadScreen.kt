@@ -42,11 +42,13 @@ fun ImageUploadScreen(onBack: () -> Unit) {
 
     // 사진 선택기
     val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        selectedImageUri = uri // 선택한 사진의 주소를 변수에 저장
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            // 사진을 선택하고 돌아왔을 때 URI를 가져옴
+            selectedImageUri = result.data?.data
+        }
     }
-
     // 전체 화면을 Box로 감싸서 로딩 화면을 위에 겹칠 수 있게 함
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -86,12 +88,12 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                     .height(300.dp)
                     .background(Color.White, shape = RoundedCornerShape(16.dp))
                     .clickable {
-                        // 박스 클릭 시 갤러리 열기
-                        // galleryLauncher.launch(
-                          //  PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                        galleryLauncher.launch("image/*")
-
-
+                        // 👇 [수정] "모든 이미지(EXTERNAL_CONTENT_URI)"를 가져오는 갤러리 실행 인텐트!
+                        val intent = android.content.Intent(
+                            android.content.Intent.ACTION_PICK,
+                            android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                        )
+                        galleryLauncher.launch(intent)
                     },
                 contentAlignment = Alignment.Center
             ) {
