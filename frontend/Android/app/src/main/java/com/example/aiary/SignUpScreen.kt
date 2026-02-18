@@ -40,7 +40,7 @@ fun SignUpScreen(onNavigateToLogin: () -> Unit) {
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // 상단 타이틀 및 뒤로가기
+        // 1. 상단 타이틀 및 뒤로가기
         Row(
             modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 40.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -57,7 +57,7 @@ fun SignUpScreen(onNavigateToLogin: () -> Unit) {
             )
         }
 
-        // 입력 필드들
+        // 2. 입력 필드들
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
@@ -118,7 +118,7 @@ fun SignUpScreen(onNavigateToLogin: () -> Unit) {
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // 가입하기 버튼
+        // 3. 가입하기 버튼
         Button(
             onClick = {
                 // 유효성 검사
