@@ -37,6 +37,27 @@ import com.example.aiary.data.StoryBookData
 import com.example.aiary.data.StoryEvent
 import com.example.aiary.data.UserSession
 import com.example.aiary.network.RetrofitClient
+import java.io.File
+import java.io.FileOutputStream
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.clickable
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 
 private val White = Color(0xFFFFFFFF)
 
@@ -68,6 +89,7 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
         val uriString = sharedPreferences.getString("baby_photo", null)
         mutableStateOf(if (uriString != null) Uri.parse(uriString) else null)
     }
+
 
     // D-Day 계산 로직
     val (currentDateString, dDayString) = remember(sharedBabyBirthDate) {
@@ -127,15 +149,17 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                                 .size(220.dp)
                                 .shadow(10.dp, CircleShape)
                                 .clip(CircleShape)
-                                .background(White)
-                                .border(6.dp, White, CircleShape)
+                            //    .background(White)
+                            //    .border(6.dp, White, CircleShape)
                         ) {
                             if (sharedProfileUri != null) {
                                 AsyncImage(
                                     model = sharedProfileUri,
                                     contentDescription = "아이 사진",
                                     contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize().padding(6.dp).clip(CircleShape)
+                                    modifier = Modifier.fillMaxSize().
+                                    //padding(6.dp).
+                                    clip(CircleShape)
                                 )
                             } else {
                                 Image(
@@ -170,26 +194,87 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                     }
                 }
                 2 -> {
-                    var storyData by remember { mutableStateOf<StoryBookData?>(null) }
+                    var reportList by remember { mutableStateOf<List<StoryBookData>>(emptyList()) }
+                    var selectedReport by remember { mutableStateOf<StoryBookData?>(null) }
+                    
+                    // 각 월(Month)별 전체 사진들을 저장해둘 공간 (표지 변경 기능에 쓰임)
+                    var monthPhotosMap by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
+
                     LaunchedEffect(Unit) {
                         try {
                             val myId = UserSession.userId
                             val response = RetrofitClient.api.getDiaries(myId)
                             if (response.isSuccessful) {
                                 val diaries = response.body() ?: emptyList()
+
                                 if (diaries.isNotEmpty()) {
-                                    val mainPhoto = diaries.last().image_url
-                                    val events = diaries.take(3).map { StoryEvent("기록",
-                                        listOf(it.image_url), it.content) }
-                                    storyData = StoryBookData("2025.12", mainPhoto,
-                                        "이번 달에는 총 ${diaries.size}개의 추억이 있습니다.", events)
+                                    // 서버에서 온 일기들을 "YYYY.MM" (예: 2025.12) 단위로 그룹화(묶기) 합니다.
+                                    val groupedDiaries = diaries.groupBy { diary ->
+                                        if (diary.created_at.length >= 7) {
+                                            // "2025-12-11T..." -> "2025-12" -> "2025.12"
+                                            diary.created_at.substring(0, 7).replace("-", ".")
+                                        } else {
+                                            "알 수 없음"
+                                        }
+                                    }
+
+                                    val tempReportList = mutableListOf<StoryBookData>()
+                                    val tempPhotosMap = mutableMapOf<String, List<String>>()
+
+                                    // 묶여진 월별 일기들을 바탕으로 진짜 책(리포트)을 만듭니다.
+                                    for ((monthStr, monthDiaries) in groupedDiaries) {
+                                        // 해당 월의 모든 사진 주소 정리
+                                        val photoUrls = monthDiaries.map { diary ->
+                                            if (diary.image_url.startsWith("http")) diary.image_url
+                                            else "http://3.35.185.251:8000${diary.image_url}"
+                                        }
+                                        tempPhotosMap[monthStr] = photoUrls
+
+                                        // 해당 월의 이벤트 추출
+                                        val events = monthDiaries.take(3).map { diary ->
+                                            val fixedEventUrl = if (diary.image_url.startsWith("http")) diary.image_url else "http://3.35.185.251:8000${diary.image_url}"
+                                            StoryEvent("기록", listOf(fixedEventUrl), diary.content)
+                                        }
+
+                                        // 리포트 1권 완성!
+                                        tempReportList.add(
+                                            StoryBookData(
+                                                month = monthStr, // "2025.12" 등
+                                                mainPhotoUrl = photoUrls.last(), // 가장 최근 사진을 표지로
+                                                summary = "${monthStr}의 소중한 추억들입니다. (총 ${monthDiaries.size}개의 기록)", // 임시 요약글
+                                                events = events
+                                            )
+                                        )
+                                    }
+
+                                    // 최신 달이 맨 앞에 오도록 정렬해서 저장
+                                    reportList = tempReportList.sortedByDescending { it.month }
+                                    monthPhotosMap = tempPhotosMap
                                 }
                             }
                         } catch (e: Exception) { e.printStackTrace() }
                     }
-                    if (storyData != null) BookStoryScreen(storyData = storyData!!, onBack = { selectedItem = 0 })
-                    else Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("리포트 생성 중...", color = Color.Gray) }
+
+                    if (selectedReport == null) {
+                        ReportListScreen(
+                            reports = reportList,
+                            onReportClick = { report -> selectedReport = report }
+                        )
+                    } else {
+                        BookStoryScreen(
+                            storyData = selectedReport!!,
+                            // 내가 선택한 달(month)의 사진들만 팝업에 넘겨줌!
+                            allMonthPhotoUrls = monthPhotosMap[selectedReport!!.month] ?: emptyList(),
+                            onBack = { selectedReport = null },
+                            onMainPhotoChanged = { newUrl ->
+                                selectedReport = selectedReport!!.copy(mainPhotoUrl = newUrl)
+                                reportList = reportList.map { report ->
+                                    if (report.month == selectedReport!!.month) report.copy(mainPhotoUrl = newUrl)
+                                    else report
+                                }
+                            }
+                        )
+                    }
                 }
                 3 -> {
                     MyPageScreen(
@@ -208,18 +293,114 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                                 .putString("baby_birth", newDate)
                                 .apply()
                         },
-                        // 사진 바뀔 때마다 저장소에도 저장!
                         onUpdateProfileImage = { newUri ->
-                            sharedProfileUri = newUri
+                            try {
+                                val inputStream = context.contentResolver.openInputStream(newUri)
+                                val file = File(context.filesDir, "baby_profile.jpg")
+                                val outputStream = FileOutputStream(file)
 
-                            // 영구 저장 (Uri를 문자열로 바꿔서 저장)
-                            sharedPreferences.edit()
-                                .putString("baby_photo", newUri.toString())
-                                .apply()
+                                inputStream?.copyTo(outputStream)
+                                inputStream?.close()
+                                outputStream.close()
+
+                                val savedUri = Uri.fromFile(file)
+
+                                sharedProfileUri = savedUri
+                                sharedPreferences.edit()
+                                    .putString("baby_photo", savedUri.toString())
+                                    .apply()
+
+                            } catch (e: Exception) {
+                                e.printStackTrace() // 복사 실패 시 로그 출력
+                            }
                         }
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+fun ReportListScreen(
+    reports: List<StoryBookData>, // 리포트 목록 데이터
+    onReportClick: (StoryBookData) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BackgroundBeige)
+            .padding(24.dp)
+    ) {
+        Text(
+            text = "추억 보관함 📚",
+            fontSize = 24.sp,
+            fontWeight = FontWeight.Bold,
+            color = DarkGray,
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
+
+        if (reports.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("아직 생성된 리포트가 없어요.", color = Color.Gray)
+            }
+        } else {
+            // 2칸짜리 격자 모양 책장
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(2),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp)
+            ) {
+                items(reports) { report ->
+                    ReportItem(report = report, onClick = { onReportClick(report) })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun ReportItem(
+    report: StoryBookData,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clickable { onClick() }
+    ) {
+        // 책 표지 모양 (그림자 효과)
+        Card(
+            shape = RoundedCornerShape(8.dp), // 책은 둥근 모서리가 적게
+            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(0.7f) // 책 비율 (세로로 긴 형태)
+        ) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                AsyncImage(
+                    model = report.mainPhotoUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+                // 책등 효과 (왼쪽에 살짝 음영을 줘서 책처럼 보이게 함)
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(6.dp)
+                        .background(Color.Black.copy(alpha = 0.2f))
+                        .align(Alignment.CenterStart)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        // 연월 표시 (예: 2025.12)
+        Text(
+            text = report.month,
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = DarkGray
+        )
     }
 }
