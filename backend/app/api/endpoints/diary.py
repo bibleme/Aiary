@@ -1,9 +1,9 @@
-# app/api/endpoints/diary.py
+# backend/app/api/endpoints/diary.py
 
 from datetime import datetime, date, time
 from pathlib import Path
 from uuid import uuid4
-from typing import List
+from typing import List, Optional
 
 from fastapi import (
     APIRouter,
@@ -20,18 +20,16 @@ from sqlalchemy import select
 from app.db.database import get_db_session
 from app.db.model import Diary
 from app.services.ai_generator import (
-    generate_one_line_diary,    # OpenAI Vision + GPT 한 줄 일기
-    generate_daily_summary,     # (선택) OpenAI 기반 하루 요약 텍스트
+    generate_one_line_diary,   # OpenAI Vision + GPT 한 줄 일기
+    generate_daily_summary,    # (선택) OpenAI 기반 하루 요약 텍스트
 )
 from app.services.daily_diary_generator import (
-    generate_daily_diary,       # KoBART 하루 줄글 일기 생성
+    generate_daily_diary,      # KoBART 하루 줄글 일기 생성
 )
 
 router = APIRouter(tags=["diaries"])
 
-
 # ---------- 공통으로 쓸 Pydantic 모델 ----------
-
 class DaySummaryRequest(BaseModel):
     """
     하루 요약/줄글 일기를 생성할 때 공통으로 사용하는 요청 바디 형태.
@@ -41,10 +39,7 @@ class DaySummaryRequest(BaseModel):
     user_id: int
     date: str
 
-
 # ---------- 공통 상수 / 디렉터리 설정 ----------
-
-# 한 줄 일기를 만들 때 사용할 GPT 프롬프트
 GPT_USER_PROMPT = (
     "위 이미지를 보고 오늘 있었던 순간을 떠올리듯이 "
     "아이의 감정, 행동을 파악하고, 주변 사물로 상황을 파악하여 "
@@ -52,45 +47,60 @@ GPT_USER_PROMPT = (
     "문장에 이모지를 적극적으로 활용하세요."
 )
 
-# 이미지 저장용 디렉터리 (프로젝트 루트 기준)
 MEDIA_DIR = Path("media")
 IMAGES_DIR = MEDIA_DIR / "images"
 MEDIA_DIR.mkdir(exist_ok=True)
 IMAGES_DIR.mkdir(exist_ok=True)
 
-
 def _generate_filename(original_name: str) -> str:
-    """
-    업로드된 파일 이름에서 확장자를 유지하면서
-    'YYYYMMDD_HHMMSS_랜덤8글자.ext' 형태의 고유한 파일명 생성
-    """
-    ext = Path(original_name).suffix  # .jpg, .png ...
+    ext = Path(original_name).suffix
     ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     uid = uuid4().hex[:8]
     return f"{ts}_{uid}{ext}"
 
+def _parse_date_range(date_str: str) -> tuple[datetime, datetime, date]:
+    """
+    "YYYY-MM-DD" 문자열을 받아서
+    - 해당 날짜의 00:00:00
+    - 해당 날짜의 23:59:59.999999
+    를 반환.
+    """
+    try:
+        target_date = date.fromisoformat(date_str)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="날짜 형식은 YYYY-MM-DD 이어야 합니다.")
+    start_dt = datetime.combine(target_date, time.min)
+    end_dt = datetime.combine(target_date, time.max)
+    return start_dt, end_dt, target_date
 
-# 1) 이미지 업로드 + 한 줄 일기 생성
 
+# 1) 이미지 업로드 + 한 줄 일기 생성 (+ ✅ date 저장)
 @router.post("/diaries/")
 async def create_diary(
-    user_id: int = Form(...),        # 프론트에서 넘어오는 user_id (정수)
-    photo: UploadFile = File(...),   # multipart/form-data 의 파일 필드
+    user_id: int = Form(...),
+    photo: UploadFile = File(...),
+    # ✅ 프론트 요청사항: date도 받기 (없어도 오늘로 저장되어 안 터지게)
+    date_str: Optional[str] = Form(None),   # 프론트에서 "date" 키로 보내면 여기에 들어옴
     db: AsyncSession = Depends(get_db_session),
 ):
     """
     1. 사진 파일을 업로드 받고
     2. OpenAI Vision + GPT로 한 줄 일기를 생성한 뒤
     3. media/images/ 폴더에 이미지를 저장하고
-    4. Diary 테이블에 (user_id, content, image_url, created_at)을 저장.
-
-    프론트는 응답으로 넘어오는 `image_url`을 그대로 사용해서
-    BASE_URL + image_url 형태로 이미지를 보여줄 수 있다.
+    4. Diary 테이블에 (user_id, content, image_url, created_at, diary_date)을 저장
     """
     try:
+        # ✅ date 파싱 (없으면 오늘)
+        if date_str:
+            try:
+                diary_date = date.fromisoformat(date_str)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="date는 YYYY-MM-DD 형식이어야 합니다.")
+        else:
+            diary_date = date.today()
+
         # 1) 이미지 바이트 읽기
         image_bytes = await photo.read()
-
         if not image_bytes:
             raise HTTPException(status_code=400, detail="빈 이미지 파일입니다.")
 
@@ -100,21 +110,21 @@ async def create_diary(
             GPT_USER_PROMPT,
         )
 
-        # 3) 이미지 파일을 서버 로컬 디스크에 저장
+        # 3) 이미지 파일 저장
         filename = _generate_filename(photo.filename)
         file_path = IMAGES_DIR / filename
         with open(file_path, "wb") as f:
             f.write(image_bytes)
 
-        # 프론트에서 사용할 이미지 URL (StaticFiles로 /media 마운트되어 있음)
         image_url = f"/media/images/{filename}"
 
-        # 4) DB에 Diary 레코드 저장
+        # 4) DB 저장 (✅ diary_date 포함)
         new_diary = Diary(
             user_id=user_id,
             content=one_line_diary,
             image_url=image_url,
             created_at=datetime.utcnow(),
+            diary_date=diary_date,
         )
         db.add(new_diary)
         await db.commit()
@@ -128,34 +138,37 @@ async def create_diary(
                 "content": new_diary.content,
                 "image_url": new_diary.image_url,
                 "created_at": new_diary.created_at.isoformat(),
+                "diary_date": new_diary.diary_date.isoformat(),
             },
         }
 
     except HTTPException:
-        # 우리가 명시적으로 발생시킨 HTTPException은 그대로 전달
         raise
     except Exception as e:
-        # 나머지는 500 에러로 감싸서 반환
         raise HTTPException(status_code=500, detail=f"Diary creation failed: {e}")
 
 
-# 2) 유저별 일기 리스트 조회
-
+# 2) 유저별 일기 리스트 조회 (✅ 옵션: date로 필터 가능)
 @router.get("/diaries/")
 async def list_diaries(
     user_id: int,
+    date_str: Optional[str] = None,  # ?date_str=YYYY-MM-DD 를 주면 그 날짜만
     db: AsyncSession = Depends(get_db_session),
 ):
     """
-    특정 user_id 의 Diary들을 `created_at` 최신순으로 반환.
-    (나중에 페이지네이션이 필요하면 limit/offset 추가 가능)
+    특정 user_id 의 Diary들을 반환.
+    - date_str이 있으면 diary_date 기준으로 필터링
+    - 없으면 전체를 created_at 최신순으로
     """
     try:
-        stmt = (
-            select(Diary)
-            .where(Diary.user_id == user_id)
-            .order_by(Diary.created_at.desc())
-        )
+        stmt = select(Diary).where(Diary.user_id == user_id)
+
+        if date_str:
+            _, _, target_date = _parse_date_range(date_str)
+            stmt = stmt.where(Diary.diary_date == target_date)
+
+        stmt = stmt.order_by(Diary.created_at.desc())
+
         result = await db.execute(stmt)
         diaries: List[Diary] = result.scalars().all()
 
@@ -164,57 +177,34 @@ async def list_diaries(
                 "id": d.id,
                 "user_id": d.user_id,
                 "content": d.content,
-                "image_url": d.image_url,  # "/media/images/xxx.jpg"
+                "image_url": d.image_url,
                 "created_at": d.created_at.isoformat(),
+                "diary_date": d.diary_date.isoformat(),
             }
             for d in diaries
         ]
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Diary list failed: {e}")
 
 
-# 공통: 날짜 문자열을 파싱해서 하루의 시작/끝 datetime으로 바꾸는 헬퍼
-def _parse_date_range(date_str: str) -> tuple[datetime, datetime, date]:
-    """
-    "YYYY-MM-DD" 문자열을 받아서
-    - 해당 날짜의 00:00:00 (time.min)
-    - 해당 날짜의 23:59:59.999999 (time.max)
-    를 반환.
-    """
-    try:
-        target_date = date.fromisoformat(date_str)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="날짜 형식은 YYYY-MM-DD 이어야 합니다.")
-
-    start_dt = datetime.combine(target_date, time.min)
-    end_dt = datetime.combine(target_date, time.max)
-    return start_dt, end_dt, target_date
-
-
-# 3) 하루 요약 줄글 일기 (OpenAI 기반) - Form 버전
-
+# 3) 하루 요약 (OpenAI) - Form
 @router.post("/diaries/summary")
 async def summarize_diaries_for_day(
     user_id: int = Form(...),
-    date_str: str = Form(...),  # 예: "2025-12-09"
+    date_str: str = Form(...),
     db: AsyncSession = Depends(get_db_session),
 ):
-    """
-    - 특정 user_id, 날짜에 해당하는 Diary들의 content를 모아서
-    - OpenAI GPT에게 하루 요약 줄글 일기를 생성 요청.
-    - 요청은 multipart/form-data (Form 필드) 방식.
-    """
     try:
-        # 날짜 범위 계산
-        start_dt, end_dt, _ = _parse_date_range(date_str)
+        _, _, target_date = _parse_date_range(date_str)
 
-        # 해당 날짜의 Diary 조회
+        # ✅ diary_date 기준으로 조회 (date 도입했으니 이게 정확)
         stmt = (
             select(Diary)
             .where(Diary.user_id == user_id)
-            .where(Diary.created_at >= start_dt)
-            .where(Diary.created_at <= end_dt)
+            .where(Diary.diary_date == target_date)
             .order_by(Diary.created_at.asc())
         )
         result = await db.execute(stmt)
@@ -224,8 +214,6 @@ async def summarize_diaries_for_day(
             raise HTTPException(status_code=404, detail="해당 날짜에 일기가 없습니다.")
 
         one_lines = [d.content for d in diaries]
-
-        # OpenAI GPT 기반 요약 (옵션 기능)
         summary = await generate_daily_summary(one_lines, date_str)
 
         return {
@@ -242,37 +230,21 @@ async def summarize_diaries_for_day(
         raise HTTPException(status_code=500, detail=f"Diary summary failed: {e}")
 
 
-# 4) 하루 요약 줄글 일기 (OpenAI 기반) - JSON 버전
-
+# 4) 하루 요약 (OpenAI) - JSON
 @router.post("/diaries/summary-json")
 async def summarize_diaries_for_day_json(
-    payload: DaySummaryRequest,              # JSON Body 전체를 한 번에 받음
+    payload: DaySummaryRequest,
     db: AsyncSession = Depends(get_db_session),
 ):
-    """
-    JSON Body 예시:
-        {
-          "user_id": 1,
-          "date": "2025-12-09"
-        }
-
-    동작은 /diaries/summary 와 동일하지만
-    content-type 이 application/json 인 버전.
-    (안드로이드에서 Retrofit @Body 로 보내기 편함)
-    """
     try:
         user_id = payload.user_id
         date_str = payload.date
+        _, _, target_date = _parse_date_range(date_str)
 
-        # 날짜 범위 계산
-        start_dt, end_dt, _ = _parse_date_range(date_str)
-
-        # 해당 날짜의 Diary 조회
         stmt = (
             select(Diary)
             .where(Diary.user_id == user_id)
-            .where(Diary.created_at >= start_dt)
-            .where(Diary.created_at <= end_dt)
+            .where(Diary.diary_date == target_date)
             .order_by(Diary.created_at.asc())
         )
         result = await db.execute(stmt)
@@ -282,8 +254,6 @@ async def summarize_diaries_for_day_json(
             raise HTTPException(status_code=404, detail="해당 날짜에 일기가 없습니다.")
 
         one_lines = [d.content for d in diaries]
-
-        # OpenAI GPT 기반 요약 (옵션 기능)
         summary = await generate_daily_summary(one_lines, date_str)
 
         return {
@@ -300,44 +270,21 @@ async def summarize_diaries_for_day_json(
         raise HTTPException(status_code=500, detail=f"Diary summary (json) failed: {e}")
 
 
-# 5) 하루 "줄글 일기" (KoBART 학습 모델) 생성 - JSON 버전
-
+# 5) 하루 "줄글 일기" (KoBART) - JSON
 @router.post("/diaries/full")
 async def create_full_daily_diary(
-    payload: DaySummaryRequest,              # { "user_id": 1, "date": "2025-12-09" }
+    payload: DaySummaryRequest,
     db: AsyncSession = Depends(get_db_session),
 ):
-    """
-    ✅ 이 엔드포인트가 **KoBART 학습 모델**을 사용하는 핵심 API.
-
-    동작:
-      1) 특정 user_id + date 에 해당하는 Diary.content(한 줄 일기)들을 전부 모음
-      2) daily_diary_generator.generate_daily_diary() 호출
-         - 내부에서:
-           - 한 줄 일기들을 클린업
-           - "1. ~" 리스트(bullet_lines) + combined_summary를 만들고
-           - KoBART 모델로 줄글 하루 일기 생성
-      3) bullet_lines / combined_summary / generated_diary 를 함께 반환
-
-    요청 JSON 예시:
-        {
-          "user_id": 1,
-          "date": "2025-12-09"
-        }
-    """
     try:
         user_id = payload.user_id
         date_str = payload.date
+        _, _, target_date = _parse_date_range(date_str)
 
-        # 날짜 범위 계산
-        start_dt, end_dt, _ = _parse_date_range(date_str)
-
-        # 해당 날짜의 Diary 조회
         stmt = (
             select(Diary)
             .where(Diary.user_id == user_id)
-            .where(Diary.created_at >= start_dt)
-            .where(Diary.created_at <= end_dt)
+            .where(Diary.diary_date == target_date)
             .order_by(Diary.created_at.asc())
         )
         result = await db.execute(stmt)
@@ -346,22 +293,16 @@ async def create_full_daily_diary(
         if not diaries:
             raise HTTPException(status_code=404, detail="해당 날짜에 일기가 없습니다.")
 
-        # 한 줄 일기 텍스트만 추출
         one_lines = [d.content for d in diaries]
-
-        # KoBART 하루 줄글 일기 생성 (heavy 연산은 daily_diary_generator 내부에서 thread pool로 실행)
         gen_result = await generate_daily_diary(one_lines)
 
         return {
             "status": "success",
             "user_id": user_id,
             "date": date_str,
-            # 모델이 사용한 중간 요약 정보들
-            "bullet_lines": gen_result["bullet_lines"],           # ["1. ...", "2. ...", ...]
-            "combined_summary": gen_result["combined_summary"],   # bullet들을 합친 문자열
-            # 최종 줄글 하루 일기
+            "bullet_lines": gen_result["bullet_lines"],
+            "combined_summary": gen_result["combined_summary"],
             "full_diary": gen_result["generated_diary"],
-            # 원본 한 줄 일기 개수
             "source_count": len(one_lines),
         }
 
@@ -369,3 +310,46 @@ async def create_full_daily_diary(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Daily diary generation failed: {e}")
+
+
+# ✅ 6) 삭제 API (일기 + 이미지 파일 삭제)
+@router.delete("/diaries/{diary_id}")
+async def delete_diary(
+    diary_id: int,
+    user_id: int,  # 인증 토큰이 없으니 임시로 query param으로 받음: /diaries/123?user_id=1
+    db: AsyncSession = Depends(get_db_session),
+):
+    try:
+        # 1) 일기 조회
+        stmt = select(Diary).where(Diary.id == diary_id)
+        result = await db.execute(stmt)
+        diary: Diary | None = result.scalar_one_or_none()
+
+        if diary is None:
+            raise HTTPException(status_code=404, detail="해당 일기가 존재하지 않습니다.")
+
+        # 2) 본인 글인지 확인
+        if diary.user_id != user_id:
+            raise HTTPException(status_code=403, detail="삭제 권한이 없습니다.")
+
+        # 3) 이미지 파일 삭제 시도 (실패해도 DB 삭제는 진행)
+        try:
+            # diary.image_url = "/media/images/xxx.jpg"
+            if diary.image_url and diary.image_url.startswith("/media/images/"):
+                filename = diary.image_url.split("/")[-1]
+                file_path = IMAGES_DIR / filename
+                if file_path.exists():
+                    file_path.unlink()
+        except Exception:
+            pass
+
+        # 4) DB 삭제
+        await db.delete(diary)
+        await db.commit()
+
+        return {"status": "success", "deleted_diary_id": diary_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Diary delete failed: {e}")
