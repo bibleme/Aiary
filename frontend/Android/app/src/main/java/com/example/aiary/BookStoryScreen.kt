@@ -44,14 +44,14 @@ val KeywordBlue = Color(0xFF4A90E2)
 @Composable
 fun BookStoryScreen(
     storyData: StoryBookData,
-    allMonthPhotoUrls: List<String>, // [추가] 그 달의 모든 사진 리스트를 받아옴
+    allMonthPhotoUrls: List<String>, // 그 달의 모든 사진 리스트를 받아옴
     onBack: () -> Unit,
     onMainPhotoChanged: (String) -> Unit
 ) {
-    // [추가] 현재 선택된 메인 사진 (초기값은 데이터의 mainPhotoUrl)
+    // 현재 선택된 메인 사진 (초기값은 데이터의 mainPhotoUrl)
     var currentMainPhoto by remember { mutableStateOf(storyData.mainPhotoUrl) }
 
-    // [추가] 사진 변경 팝업 열림 여부
+    // 사진 변경 팝업 열림 여부
     var isPhotoPickerOpen by remember { mutableStateOf(false) }
 
     var selectedEvent by remember { mutableStateOf<StoryEvent?>(null) }
@@ -93,7 +93,6 @@ fun BookStoryScreen(
                         rotationY = rotation
                         cameraDistance = 12f * density
                     }
-
             ) {
                 if (rotation <= 90f) {
                     BookCover(
@@ -111,7 +110,6 @@ fun BookStoryScreen(
                             selectedEvent = event
                             isEventDialogOpen = true
                         },
-                        // 여기도 뒤집는 행동을 넘겨줍니다.
                         onFlipClick = { isFlipped = !isFlipped },
                         modifier = Modifier
                             .fillMaxSize()
@@ -132,7 +130,7 @@ fun BookStoryScreen(
             )
         }
 
-        // 대표 사진 변경 팝업 (그리드 형태)
+        // [추가] 대표 사진 변경 팝업 (그리드 형태)
         if (isPhotoPickerOpen) {
             PhotoSelectionDialog(
                 photoUrls = allMonthPhotoUrls,
@@ -153,7 +151,7 @@ fun BookCover(
     mainPhotoUrl: String,
     month: String,
     onEditClick: () -> Unit,
-    onFlipClick: () -> Unit, 
+    onFlipClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -284,7 +282,7 @@ fun BookInside(
                     color = DarkGray
                 ),
                 onClick = { offset ->
-
+                
                     // 파란 글씨(키워드)를 눌렀는지 확인
                     val clickedAnnotation = annotatedString.getStringAnnotations(tag = "EVENT", start = offset, end = offset).firstOrNull()
 
@@ -366,13 +364,14 @@ fun PhotoSelectionDialog(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier.heightIn(max = 400.dp)
             ) {
+             
                 items(photoUrls) { url ->
                     AsyncImage(
                         model = url,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .aspectRatio(1f) // 정사각형 비율
+                            .aspectRatio(1f) 
                             .clip(RoundedCornerShape(4.dp))
                             .clickable { onPhotoSelected(url) } // 클릭하면 선택된 사진 주소를 넘겨줌
                     )
