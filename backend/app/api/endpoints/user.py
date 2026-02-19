@@ -7,7 +7,7 @@ from app.config import settings
 
 from app.db.database import get_db_session
 from app.db.model import User
-from app.schemas.user import UserCreate, UserResponse, UserLogin, Token
+from app.schemas.user import UserCreate, UserResponse, UserLogin, Token, PasswordChangeRequest
 from app.services.security import get_password_hash, verify_password, create_access_token
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -60,3 +60,35 @@ async def login_user(user_data: UserLogin, db: AsyncSession = Depends(get_db_ses
     
     # 3. 토큰 반환
     return {"access_token": access_token, "token_type": "bearer"}
+
+# -------------------- 3. 비밀번호 변경 (Change Password) --------------------
+@router.put("/password", status_code=status.HTTP_200_OK)
+async def change_password(
+    payload: PasswordChangeRequest,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user) # 👈 핵심! 토큰을 가진 유저만 통과
+):
+    """
+    JWT 토큰을 이용한 비밀번호 변경
+    """
+    # 1. 기존 비밀번호 확인
+    if not verify_password(payload.old_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="기존 비밀번호가 일치하지 않습니다."
+        )
+
+    # 2. 새 비밀번호가 기존 비밀번호와 같은지 확인
+    if payload.old_password == payload.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="새 비밀번호는 기존 비밀번호와 다르게 설정해야 합니다."
+        )
+
+    # 3. 새 비밀번호 해시(암호화) 및 저장
+    current_user.hashed_password = get_password_hash(payload.new_password)
+    
+    db.add(current_user)
+    await db.commit()
+    
+    return {"message": "비밀번호가 성공적으로 변경되었습니다."}
