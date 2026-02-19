@@ -10,6 +10,8 @@ import retrofit2.http.POST
 import retrofit2.http.Part
 import com.example.aiary.data.ChangePasswordRequest
 import retrofit2.http.*
+import retrofit2.http.DELETE
+import retrofit2.http.Path
 
 interface ApiService {
 
@@ -26,14 +28,22 @@ interface ApiService {
     ): Response<LoginResponse>
 
     // 사진 업로드 및 한 줄 일기 생성
-    @Multipart
+    /*@Multipart
     @POST("diaries/")
     suspend fun createDiary(
         @Part("user_id") userId: RequestBody,
         @Part photo: MultipartBody.Part
+    ): Response<CreateDiaryResponse>*/
+
+    @Multipart
+    @POST("diaries/") // 백엔드 주소
+    suspend fun createDiary(
+        @Part("user_id") userId: RequestBody,
+        @Part("date") date: RequestBody,
+        @Part photo: MultipartBody.Part
     ): Response<CreateDiaryResponse>
 
-    // 하루 줄글 일기 생성 (KoBART)
+    // 하루 줄글 일기 생성
     @POST("diaries/full")
     suspend fun createFullDiary(
         @Body request: DaySummaryRequest
@@ -50,4 +60,9 @@ interface ApiService {
         @Query("user_id") userId: Int
     ): Response<List<DiaryResponse>>
 
+    @DELETE("diaries/{diary_id}")
+    suspend fun deleteDiary(
+        @Path("diary_id") diaryId: Int,
+        @Query("user_id") userId: Int
+    ): Response<Unit>
 }
