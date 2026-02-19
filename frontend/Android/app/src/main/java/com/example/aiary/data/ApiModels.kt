@@ -73,5 +73,8 @@ data class DiaryResponse(
     val user_id: Int,
     val content: String,
     val image_url: String,
-    val created_at: String
+    val created_at: String,
+    
+    @SerializedName("diary_date") 
+    val diary_date: String? = null
 )
