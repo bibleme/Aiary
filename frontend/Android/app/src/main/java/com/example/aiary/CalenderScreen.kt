@@ -36,10 +36,10 @@ fun CalendarScreen(onDateClick: (String) -> Unit) {
     // 현재 보여줄 '연도'와 '월'을 상태로 관리
     var currentYearMonth by remember { mutableStateOf(YearMonth.now()) }
 
-    // 일기가 작성된 날짜(일)들을 저장하는 Set (예: 5일, 12일에 썼다면 setOf(5, 12))
+    // [추가 1] 일기가 작성된 날짜(일)들을 저장하는 Set (예: 5일, 12일에 썼다면 setOf(5, 12))
     var writtenDays by remember { mutableStateOf<Set<Int>>(emptySet()) }
 
-    // 달(currentYearMonth)이 바뀔 때마다 서버에서 일기 목록을 확인합니다.
+    // [추가 2] 달(currentYearMonth)이 바뀔 때마다 서버에서 일기 목록을 확인합니다.
     LaunchedEffect(currentYearMonth) {
         try {
             val myId = UserSession.userId
@@ -53,7 +53,7 @@ fun CalendarScreen(onDateClick: (String) -> Unit) {
 
                 // 이번 달에 해당하는 일기들의 '일(day)'만 뽑아내서 중복 제거(toSet)
                 val daysWithDiary = allDiaries.mapNotNull { diary ->
-                    val dateStr = diary.created_at
+                    val dateStr = diary.diary_date ?: diary.created_at
                     // 날짜 형태가 "2025-12-11T..." 라고 가정하고 앞부분이 일치하는지 확인
                     if (dateStr.startsWith(targetPrefix) && dateStr.length >= 10) {
                         // 8번째부터 10번째 앞까지 자르면 "11" 같은 일(day)이 나옴
@@ -63,7 +63,7 @@ fun CalendarScreen(onDateClick: (String) -> Unit) {
                     }
                 }.toSet()
 
-                writtenDays = daysWithDiary 
+                writtenDays = daysWithDiary // 상태 업데이트 -> 화면이 다시 그려짐
             }
         } catch (e: Exception) {
             Log.e("CalendarScreen", "일기 목록 불러오기 실패", e)
@@ -153,7 +153,7 @@ fun CalendarScreen(onDateClick: (String) -> Unit) {
                     if (writtenDays.contains(day)) {
                         Box(
                             modifier = Modifier
-                                .align(Alignment.TopEnd) // 우측 상단에 착 붙임
+                                .align(Alignment.TopEnd) 
                                 .padding(8.dp) 
                                 .size(6.dp) 
                                 .background(Color.Red, CircleShape) // 빨간색 동그라미
