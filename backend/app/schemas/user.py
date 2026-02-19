@@ -23,3 +23,8 @@ class UserResponse(UserBase):
 
     class Config:
         from_attributes = True
+
+# 비밀번호 변경
+class PasswordChangeRequest(BaseModel):
+    old_password: str
+    new_password: str
