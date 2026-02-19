@@ -196,7 +196,7 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                 2 -> {
                     var reportList by remember { mutableStateOf<List<StoryBookData>>(emptyList()) }
                     var selectedReport by remember { mutableStateOf<StoryBookData?>(null) }
-                    
+
                     // 각 월(Month)별 전체 사진들을 저장해둘 공간 (표지 변경 기능에 쓰임)
                     var monthPhotosMap by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
 
@@ -208,7 +208,7 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                                 val diaries = response.body() ?: emptyList()
 
                                 if (diaries.isNotEmpty()) {
-                                    // 서버에서 온 일기들을 "YYYY.MM" (예: 2025.12) 단위로 그룹화(묶기) 합니다.
+                                    // 1. 서버에서 온 일기들을 "YYYY.MM" (예: 2025.12) 단위로 그룹화(묶기) 합니다.
                                     val groupedDiaries = diaries.groupBy { diary ->
                                         if (diary.created_at.length >= 7) {
                                             // "2025-12-11T..." -> "2025-12" -> "2025.12"
@@ -221,7 +221,7 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                                     val tempReportList = mutableListOf<StoryBookData>()
                                     val tempPhotosMap = mutableMapOf<String, List<String>>()
 
-                                    // 묶여진 월별 일기들을 바탕으로 진짜 책(리포트)을 만듭니다.
+                                    // 2. 묶여진 월별 일기들을 바탕으로 진짜 책(리포트)을 만듭니다.
                                     for ((monthStr, monthDiaries) in groupedDiaries) {
                                         // 해당 월의 모든 사진 주소 정리
                                         val photoUrls = monthDiaries.map { diary ->
