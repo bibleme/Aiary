@@ -3,33 +3,33 @@ package com.example.aiary.data
 import javax.annotation.processing.Generated
 import com.google.gson.annotations.SerializedName
 
-// 1. 로그인 요청
+// 로그인 요청
 data class LoginRequest(
     val email: String,
     val password: String
 )
 
-// 2. 로그인 응답 (백엔드 user.py 참고: Token 모델)
+// 로그인 응답 (백엔드 user.py 참고: Token 모델)
 // user_id가 없고 access_token만 옴 -> 나중에 토큰에서 id 추출해야 함
 data class LoginResponse(
     val access_token: String,
     val token_type: String
 )
 
-// 3. 회원가입 요청
+// 회원가입 요청
 data class RegisterRequest(
     val email: String,
     val password: String
 )
 
-// 4. 회원가입 응답
+// 회원가입 응답
 data class UserResponse(
     val id: Int,
     val email: String,
     val created_at: String
 )
 
-// 5. 일기 생성 응답 (백엔드 diary.py: create_diary 반환값 참고)
+// 일기 생성 응답 (백엔드 diary.py: create_diary 반환값 참고)
 // { "status": "success", "diary": { ... } } 형태임
 data class CreateDiaryResponse(
     val status: String,
@@ -54,7 +54,7 @@ data class DaySummaryRequest(
 
 data class FullDiaryResponse(
     val status: String,
-    val full_diary: String?, // KoBART가 만든 줄글 일기
+    val full_diary: String?,
     val bullet_lines: List<String>?,
     val combined_summary: String?
  )
@@ -62,8 +62,7 @@ data class FullDiaryResponse(
 
 // 비밀번호 변경 요청
 data class ChangePasswordRequest(
-    val email: String,
-    val current_password: String,
+    val old_password: String,
     val new_password: String
 )
 
