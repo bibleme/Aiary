@@ -43,6 +43,7 @@ private val White = Color(0xFFFFFFFF)
 @Composable
 fun MyPageScreen(
     onLogout: () -> Unit,
+    onDeleteAccount: () -> Unit,
     viewModel: MypageViewModel = viewModel(),
     currentBabyName: String,
     currentBabyBirthDate: String,
@@ -80,6 +81,8 @@ fun MyPageScreen(
         2024, 0, 1
     )
     var showPasswordDialog by remember { mutableStateOf(false) }
+
+    var showDeleteAccountDialog by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -197,6 +200,9 @@ fun MyPageScreen(
                 SettingItem(title = "비밀번호 변경", isArrow = true, onClick = { showPasswordDialog = true })
                 HorizontalDivider(color = BackgroundBeige)
                 SettingItem(title = "로그아웃", isArrow = true, onClick = onLogout, textColor = Color.Red)
+                HorizontalDivider(color = BackgroundBeige)
+
+                SettingItem(title = "회원 탈퇴", isArrow = true, onClick = { showDeleteAccountDialog = true }, textColor = Color.Gray)
             }
         }
         Spacer(modifier = Modifier.height(50.dp))
@@ -205,6 +211,31 @@ fun MyPageScreen(
     if (showPasswordDialog){
         ChangePasswordDialog(onDismiss = { showPasswordDialog = false }, onConfirm = {
             c, n -> viewModel.changePassword(context, c, n); showPasswordDialog = false })
+    }
+
+    if (showDeleteAccountDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteAccountDialog = false },
+            containerColor = Color.White,
+            title = { Text(text = "회원 탈퇴", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+            text = { Text("정말 탈퇴하시겠습니까?\n모든 기록과 사진이 삭제되며 복구할 수 없습니다.", color = DarkGray) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteAccountDialog = false
+                        onDeleteAccount() // 부모 화면으로 탈퇴 요청 전달!
+                    }
+                ) {
+                    Text("탈퇴", color = Color.Red, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteAccountDialog = false }) {
+                    Text("취소", color = Color.Gray)
+                }
+            },
+            shape = RoundedCornerShape(16.dp)
+        )
     }
 }
 
@@ -286,7 +317,7 @@ fun ChangePasswordDialog(
                 OutlinedTextField(
                     value = newPassword,
                     onValueChange = { newPassword = it },
-                    label = { Text("새 비밀번호 (6자리 이상)") },
+                    label = { Text("새 비밀번호 (8자리 이상)") },
                     singleLine = true,
                     visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth()
