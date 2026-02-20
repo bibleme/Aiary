@@ -27,14 +27,12 @@ interface ApiService {
         @Body request: LoginRequest
     ): Response<LoginResponse>
 
-    // 사진 업로드 및 한 줄 일기 생성
-    /*@Multipart
-    @POST("diaries/")
-    suspend fun createDiary(
-        @Part("user_id") userId: RequestBody,
-        @Part photo: MultipartBody.Part
-    ): Response<CreateDiaryResponse>*/
-
+    @PUT("users/password")
+    suspend fun changePassword(
+        @Header("Authorization") token: String,
+        @Body request: ChangePasswordRequest
+    ): Response<Unit>
+    
     @Multipart
     @POST("diaries/") // 백엔드 주소
     suspend fun createDiary(
