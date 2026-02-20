@@ -15,28 +15,32 @@ class MypageViewModel : ViewModel() {
     fun changePassword(context: Context, currentPw: String, newPw: String) {
         viewModelScope.launch {
             try {
-                val myEmail = UserSession.userEmail
+                // UserSession에서 토큰을 꺼내 "Bearer " 형식으로 만듭니다
+                val token = "Bearer ${UserSession.accessToken}"
 
                 val request = ChangePasswordRequest(
-                    email = myEmail,
-                    current_password = currentPw,
+                    old_password = currentPw,
                     new_password = newPw
                 )
 
-                // 백엔드 통신 시도
-                val response = RetrofitClient.api.changePassword(request)
+                // API를 호출할 때 토큰(token)과 데이터(request)를 함께 보냅니다
+                val response = RetrofitClient.api.changePassword(token, request)
 
                 if (response.isSuccessful) {
-                    Toast.makeText(context, "비밀번호가 변경되었습니다.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "비밀번호가 성공적으로 변경되었습니다.", Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(context, "변경 실패: 현재 비밀번호를 확인해주세요.", Toast.LENGTH_SHORT).show()
+                    // 백엔드 가이드라인에 맞춰 에러 원인을 더 정확히 알려줍니다
+                    val errorMessage = when(response.code()) {
+                        400 -> "현재 비밀번호가 틀렸거나, 새 비밀번호가 기존과 같습니다."
+                        401 -> "로그인이 풀렸습니다. 다시 로그인해주세요."
+                        422 -> "입력 형식이 잘못되었습니다."
+                        else -> "변경 실패: ${response.code()}"
+                    }
+                    Toast.makeText(context, errorMessage, Toast.LENGTH_LONG).show()
                 }
             } catch (e: Exception) {
-                Toast.makeText(context, "오류 발생: ${e.message}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, "네트워크 오류 발생: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
-
-
 }
-
