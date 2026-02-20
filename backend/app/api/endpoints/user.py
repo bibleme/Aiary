@@ -4,11 +4,11 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 
 from app.config import settings
 from app.db.database import get_db_session
-from app.db.model import User
+from app.db.model import User, Diary
 from app.schemas.user import UserCreate, UserResponse, UserLogin, Token, PasswordChangeRequest
 from app.services.security import (
     get_password_hash,
@@ -80,3 +80,36 @@ async def change_password(
     await db.refresh(current_user)
 
     return {"message": "비밀번호가 성공적으로 변경되었습니다."}
+
+# -------------------- 4. 회원 탈퇴 (Withdraw / Delete Account) --------------------
+@router.delete("/withdraw", status_code=status.HTTP_200_OK)
+async def withdraw_user(
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user) # 토큰으로 본인(현재 로그인한 유저) 확인
+):
+    """
+    토큰 인증 기반 회원 탈퇴 API
+    - 유저가 작성한 모든 일기(Diary)를 먼저 삭제한 뒤, 계정을 삭제합니다.
+    """
+    try:
+        # 1. 해당 유저가 작성한 모든 일기 데이터 일괄 삭제
+        # 데이터베이스에 "Diary 테이블에서 user_id가 이 사람인 거 다 지워!" 라고 명령
+        await db.execute(
+            delete(Diary).where(Diary.user_id == current_user.id)
+        )
+        
+        # 2. 유저(User) 계정 데이터 삭제
+        await db.delete(current_user)
+        
+        # 3. 변경사항 최종 승인 (데이터베이스에 완전히 반영)
+        await db.commit()
+        
+        return {"message": "회원 탈퇴가 완료되었습니다."}
+        
+    except Exception as e:
+        # 중간에 하나라도 에러가 나면 지우던 것을 멈추고 원래대로 되돌림(롤백)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"회원 탈퇴 처리 중 오류가 발생했습니다: {str(e)}"
+        )
