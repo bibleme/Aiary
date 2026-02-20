@@ -16,14 +16,14 @@ class User(Base):
     hashed_password = Column(String(100), nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
-    diaries = relationship("Diary", back_populates="owner")
+    diaries = relationship("Diary", back_populates="owner", cascade="all, delete-orphan")
 
 
 class Diary(Base):
     __tablename__ = "diaries"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
 
     content = Column(String, nullable=False)
     image_url = Column(String, nullable=False)
