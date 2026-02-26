@@ -223,10 +223,14 @@ fun MyPageScreen(
                 TextButton(
                     onClick = {
                         showDeleteAccountDialog = false
-                        onDeleteAccount() // 부모 화면으로 탈퇴 요청 전달!
+
+                        // 탈퇴 완료 후 onDeleteAccount 스위치만 딸깍! 켭니다.
+                        viewModel.deleteAccount(context = context) {
+                            onDeleteAccount()
+                        }
                     }
                 ) {
-                    Text("탈퇴", color = Color.Red, fontWeight = FontWeight.Bold)
+                    Text("확인", color = Color.Red)
                 }
             },
             dismissButton = {
