@@ -77,7 +77,7 @@ fun SignUpScreen(onNavigateToLogin: () -> Unit) {
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
-            label = { Text("비밀번호 (6자리 이상)") },
+            label = { Text("비밀번호 (8자리 이상)") },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
             visualTransformation = PasswordVisualTransformation(),
             shape = RoundedCornerShape(12.dp),
@@ -131,7 +131,7 @@ fun SignUpScreen(onNavigateToLogin: () -> Unit) {
                     return@Button
                 }
                 if (password.length < 6) {
-                    Toast.makeText(context, "비밀번호는 6자리 이상이어야 합니다.", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "비밀번호는 8자리 이상이어야 합니다.", Toast.LENGTH_SHORT).show()
                     return@Button
                 }
                 if (password != confirmPassword) {
