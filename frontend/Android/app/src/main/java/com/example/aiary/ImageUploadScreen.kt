@@ -1,13 +1,15 @@
 package com.example.aiary
 
+import android.app.DatePickerDialog
+import android.widget.DatePicker
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -19,11 +21,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.example.aiary.data.UserSession
 import com.example.aiary.network.RetrofitClient
 import kotlinx.coroutines.launch
@@ -31,28 +36,57 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.Calendar // 👇 날짜 선택을 위해 추가
+
+val UploadPrimaryBlue = Color(0xFF87CEFA)
+val UploadBackgroundBeige = Color(0xFFFFF99E)
+val UploadDarkGray = Color(0xFF333333)
 
 @Composable
 fun ImageUploadScreen(onBack: () -> Unit) {
     var selectedImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
-    var isLoading by remember { mutableStateOf(false) } // 로딩 상태
+    var isLoading by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
-    // 사진 선택기
-    val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        selectedImageUri = uri // 선택한 사진의 주소를 변수에 저장
+    // 👇 [추가 1] 날짜 선택을 위한 상태 변수와 달력(Calendar) 설정
+    val calendar = Calendar.getInstance()
+    var selectedDate by remember {
+        // 기본값: 오늘 날짜 (예: 2025-12-14)
+        val year = calendar.get(Calendar.YEAR)
+        val month = String.format("%02d", calendar.get(Calendar.MONTH) + 1)
+        val day = String.format("%02d", calendar.get(Calendar.DAY_OF_MONTH))
+        mutableStateOf("$year-$month-$day")
     }
 
-    // 전체 화면을 Box로 감싸서 로딩 화면을 위에 겹칠 수 있게 함
+    // 👇 [추가 2] 안드로이드 기본 달력 팝업 (DatePickerDialog) 설정
+    val datePickerDialog = DatePickerDialog(
+        context,
+        { _: DatePicker, year: Int, month: Int, dayOfMonth: Int ->
+            val formattedMonth = String.format("%02d", month + 1)
+            val formattedDay = String.format("%02d", dayOfMonth)
+            selectedDate = "$year-$formattedMonth-$formattedDay" // 선택한 날짜로 업데이트
+        },
+        calendar.get(Calendar.YEAR),
+        calendar.get(Calendar.MONTH),
+        calendar.get(Calendar.DAY_OF_MONTH)
+    )
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            // 사진을 선택하고 돌아왔을 때 URI를 가져옴
+            selectedImageUri = result.data?.data
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color(0xFFFFF99E))
+                .background(UploadBackgroundBeige)
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -60,14 +94,14 @@ fun ImageUploadScreen(onBack: () -> Unit) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 16.dp, bottom = 40.dp),
+                    .padding(top = 16.dp, bottom = 24.dp), // 간격 살짝 조절
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = { onBack() }) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "뒤로 가기",
-                        tint = Color.Black
+                        tint = UploadDarkGray
                     )
                 }
                 Spacer(modifier = Modifier.width(8.dp))
@@ -75,54 +109,80 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                     text = "사진 업로드",
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color.Black
+                    color = UploadDarkGray
                 )
             }
 
+            // 👇 [추가 3] 날짜 선택 입력칸 (클릭하면 달력 팝업 뜸)
+            OutlinedTextField(
+                value = selectedDate,
+                onValueChange = {},
+                label = { Text("기록할 날짜") },
+                readOnly = true, // 타이핑 금지, 클릭만 가능하게
+                trailingIcon = {
+                    IconButton(onClick = { datePickerDialog.show() }) {
+                        Icon(painterResource(android.R.drawable.ic_menu_my_calendar), contentDescription = "달력 아이콘")
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { datePickerDialog.show() }
+                    .padding(bottom = 24.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = UploadPrimaryBlue,
+                    unfocusedBorderColor = Color.Gray
+                )
+            )
+
             // 사진 업로드 영역
             Box(
-                modifier = Modifier
+                 modifier = Modifier
                     .fillMaxWidth()
                     .height(300.dp)
                     .background(Color.White, shape = RoundedCornerShape(16.dp))
                     .clickable {
-                        // 박스 클릭 시 갤러리 열기
-                        // galleryLauncher.launch(
-                          //  PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                        galleryLauncher.launch("image/*")
-
-
+                        // 👇 [수정] "모든 이미지(EXTERNAL_CONTENT_URI)"를 가져오는 갤러리 실행 인텐트!
+                        val intent = android.content.Intent(
+                            android.content.Intent.ACTION_PICK,
+                            android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+                        )
+                        galleryLauncher.launch(intent)
                     },
                 contentAlignment = Alignment.Center
             ) {
-                // 테두리 점선
                 val stroke = Stroke(width = 5f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(20f, 20f), 0f))
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    drawRoundRect(color = Color(0xFF87CEFA), style = stroke,
-                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx()))
+                    drawRoundRect(
+                        color = UploadPrimaryBlue,
+                        style = stroke,
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx())
+                    )
                 }
 
-                // 내용물: 사진 선택 여부에 따라 다르게 보여줌
                 if (selectedImageUri == null) {
-                    // 선택 안 됨: + 아이콘
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(text = "+", fontSize = 50.sp, color = Color(0xFF87CEFA))
-                        Text(text = "사진을 선택하거나 드래그하세요", color = Color(0xFF888888), fontSize = 14.sp)
+                        Text(text = "+", fontSize = 50.sp, color = UploadPrimaryBlue)
+                        Text(text = "사진을 선택하거나 드래그하세요", color = Color.Gray, fontSize = 14.sp)
                     }
                 } else {
-                    // 체크 아이콘과 파일명 표시
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        AsyncImage(
+                            model = selectedImageUri,
+                            contentDescription = "선택된 사진",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(2.dp)
+                        )
                         Icon(
                             imageVector = Icons.Filled.CheckCircle,
-                            contentDescription = "선택됨",
-                            tint = Color(0xFFa7c5eb),
-                            modifier = Modifier.size(60.dp)
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = "사진이 선택되었습니다!",
-                            color = Color.Black,
-                            fontWeight = FontWeight.Bold
+                            contentDescription = null,
+                            tint = UploadPrimaryBlue,
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(10.dp)
+                                .size(30.dp)
+                                .background(Color.White, CircleShape)
                         )
                     }
                 }
@@ -132,7 +192,7 @@ fun ImageUploadScreen(onBack: () -> Unit) {
 
             Text(
                 text = "최대 10장까지 선택 가능합니다.\n아이의 표정이 잘 보이는 사진이 좋아요!",
-                color = Color(0xFF888888),
+                color = Color.Gray,
                 fontSize = 12.sp,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
@@ -146,33 +206,27 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                         Toast.makeText(context, "먼저 사진을 선택해주세요!", Toast.LENGTH_SHORT).show()
                         return@Button
                     }
-
-                    isLoading = true // 로딩 시작
-
+                    isLoading = true
                     coroutineScope.launch {
                         try {
-                            // Uri -> 실제 파일로 변환
                             val file = getFileFromUri(context, selectedImageUri!!)
-
                             if (file != null) {
-                                // Multipart 형식으로 변환
                                 val requestFile = file.asRequestBody("image/*".toMediaTypeOrNull())
                                 val body = MultipartBody.Part.createFormData("photo", file.name, requestFile)
+
                                 val myId = UserSession.userId.toString()
                                 val userIdBody = myId.toRequestBody("text/plain".toMediaTypeOrNull())
 
-                                // 서버로 전송 (Retrofit)
-                                val response = RetrofitClient.api.createDiary(userIdBody, body)
+                                // 👇 [추가 4] 선택한 날짜도 서버에 같이 보내기 위해 변환
+                                val dateBody = selectedDate.toRequestBody("text/plain".toMediaTypeOrNull())
+
+                                // 🚨 [주의] 백엔드와 연결된 Retrofit API 코드 수정 필요 (아래 설명 참고)
+                                val response = RetrofitClient.api.createDiary(userIdBody, dateBody, body)
 
                                 if (response.isSuccessful) {
-                                    val result = response.body()
-                                    // 성공 시 로직
                                     Toast.makeText(context, "AI 일기 생성 완료!", Toast.LENGTH_LONG).show()
-                                    println("생성된 일기: ${result?.diary?.content}")
-
-                                    // TODO: 여기서 결과 화면으로 이동하거나 다이어리 탭으로 이동
-                                    onBack() // 임시로 홈으로 이동
-
+                                    file.delete()
+                                    onBack()
                                 } else {
                                     Toast.makeText(context, "서버 오류: ${response.code()}", Toast.LENGTH_SHORT).show()
                                 }
@@ -187,13 +241,15 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                         }
                     }
                 },
-                enabled = !isLoading, // 로딩 중엔 버튼 비활성화
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF87CEFA)),
+                enabled = !isLoading,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = UploadPrimaryBlue,
+                    disabledContainerColor = Color.LightGray
+                ),
                 shape = RoundedCornerShape(12.dp),
                 modifier = Modifier.fillMaxWidth().height(56.dp)
             ) {
                 if (isLoading) {
-                    // 로딩 중이면 버튼 안에 작은 뺑뺑이 표시
                     CircularProgressIndicator(
                         color = Color.White,
                         modifier = Modifier.size(24.dp)
@@ -204,17 +260,16 @@ fun ImageUploadScreen(onBack: () -> Unit) {
             }
         }
 
-        // 전체 화면 로딩 오버레이 (선택사항: 화면 전체를 막고 싶을 때)
         if (isLoading) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(Color.Black.copy(alpha = 0.4f))
-                    .clickable(enabled = false) {}, // 터치 막기
+                    .clickable(enabled = false) {},
                 contentAlignment = Alignment.Center
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = Color(0xFFa7c5eb))
+                    CircularProgressIndicator(color = UploadPrimaryBlue)
                     Spacer(modifier = Modifier.height(16.dp))
                     Text("AI가 열심히 분석 중입니다... 🤖", color = Color.White, fontWeight = FontWeight.Bold)
                 }
@@ -223,13 +278,13 @@ fun ImageUploadScreen(onBack: () -> Unit) {
     }
 }
 
+// ... preview와 getFileFromUri 함수는 기존과 동일
 @Preview(showBackground = true)
 @Composable
 fun ImageUploadScreenPreview() {
     ImageUploadScreen(onBack = {})
 }
 
-// Context를 이용해서 Uri -> 실제 파일로 변환하는 함수
 fun getFileFromUri(context: android.content.Context, uri: android.net.Uri): java.io.File? {
     val inputStream = context.contentResolver.openInputStream(uri) ?: return null
     val tempFile = java.io.File.createTempFile("upload", ".jpg", context.cacheDir)
@@ -237,6 +292,4 @@ fun getFileFromUri(context: android.content.Context, uri: android.net.Uri): java
         inputStream.copyTo(output)
     }
     return tempFile
-
-
 }
