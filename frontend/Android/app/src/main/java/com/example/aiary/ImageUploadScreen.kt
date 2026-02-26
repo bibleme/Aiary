@@ -220,6 +220,7 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                                 // 선택한 날짜도 서버에 같이 보내기 위해 변환
                                 val dateBody = selectedDate.toRequestBody("text/plain".toMediaTypeOrNull())
 
+                                // 백엔드와 연결된 Retrofit API 코드 수정 필요
                                 val response = RetrofitClient.api.createDiary(userIdBody, dateBody, body)
 
                                 if (response.isSuccessful) {
@@ -277,7 +278,6 @@ fun ImageUploadScreen(onBack: () -> Unit) {
     }
 }
 
-// ... preview와 getFileFromUri 함수는 기존과 동일
 @Preview(showBackground = true)
 @Composable
 fun ImageUploadScreenPreview() {
