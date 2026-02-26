@@ -63,6 +63,8 @@ class MainActivity : ComponentActivity() {
                             )
                             1 -> HomeScreen(onNavigateToUpload = { currentScreen = 2 },
                                 onLogout = {
+                                    // 로그아웃 시 아이디, 이메일, 토큰 기억을 비움
+                                    UserSession.clear()
                                     currentScreen = 0
                                     Toast.makeText(context, "로그아웃 되었습니다.", Toast.LENGTH_SHORT).show()
                                 }
@@ -167,13 +169,14 @@ fun LoginScreen(
                             val accessToken = body?.access_token
 
                             if (accessToken != null) {
-                                // ⭐ JWT 토큰에서 user_id 추출하기
+                                // JWT 토큰에서 user_id 추출하기
                                 val userId = getUserIdFromToken(accessToken)
                                 UserSession.userId = userId
                                 UserSession.userEmail = email  // 입력했던 이메일 저장
                                 UserSession.accessToken = accessToken
 
-                                Toast.makeText(context, "로그인 성공! (User ID: $userId)", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "로그인 성공! (User ID: $userId)",
+                                    Toast.LENGTH_SHORT).show()
 
                                 // TODO: 나중엔 accessToken과 userId를 Preference에 저장해야 함
 
@@ -182,7 +185,8 @@ fun LoginScreen(
                                 Toast.makeText(context, "토큰 응답 오류", Toast.LENGTH_SHORT).show()
                             }
                         } else {
-                            Toast.makeText(context, "로그인 실패: 정보를 확인하세요.", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, "로그인 실패: 정보를 확인하세요.",
+                                Toast.LENGTH_SHORT).show()
                         }
                     } catch (e: Exception) {
                         Toast.makeText(context, "오류: ${e.message}", Toast.LENGTH_SHORT).show()
