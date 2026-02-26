@@ -1,7 +1,16 @@
+// UserSession.kt
+
 package com.example.aiary.data
 
 object UserSession {
     var userId: Int = 0
     var userEmail: String = ""
     var accessToken: String = ""
+
+    // 로그아웃할 때 모든 정보를 싹 비우는 함수
+    fun clear() {
+        userId = 0
+        userEmail = ""
+        accessToken = ""
+    }
 }
