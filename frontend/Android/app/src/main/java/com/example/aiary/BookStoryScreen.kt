@@ -6,11 +6,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,7 +35,8 @@ import coil.compose.AsyncImage
 import com.example.aiary.data.StoryBookData
 import com.example.aiary.data.StoryEvent
 
-val BookCoverGreen = Color(0xFF5F8565)
+// 앱 테마 색상 (파란색)
+// val PrimaryBlue = Color(0xFF87CEFA)
 val BookInsideBg = Color(0xFFF0F0F0)
 val KeywordBlue = Color(0xFF4A90E2)
 
@@ -38,14 +44,20 @@ val KeywordBlue = Color(0xFF4A90E2)
 @Composable
 fun BookStoryScreen(
     storyData: StoryBookData,
-    onBack: () -> Unit
+    allMonthPhotoUrls: List<String>, // [추가] 그 달의 모든 사진 리스트를 받아옴
+    onBack: () -> Unit,
+    onMainPhotoChanged: (String) -> Unit
 ) {
+    // [추가] 현재 선택된 메인 사진 (초기값은 데이터의 mainPhotoUrl)
+    var currentMainPhoto by remember { mutableStateOf(storyData.mainPhotoUrl) }
+
+    // [추가] 사진 변경 팝업 열림 여부
+    var isPhotoPickerOpen by remember { mutableStateOf(false) }
+
     var selectedEvent by remember { mutableStateOf<StoryEvent?>(null) }
-    var isDialogOpen by remember { mutableStateOf(false) }
-    // 카드가 뒤집혔는지 여부 (false: 앞면, true: 뒷면)
+    var isEventDialogOpen by remember { mutableStateOf(false) }
     var isFlipped by remember { mutableStateOf(false) }
 
-    // 회전 각도 애니메이션
     val rotation by animateFloatAsState(
         targetValue = if (isFlipped) 180f else 0f,
         animationSpec = tween(durationMillis = 500),
@@ -58,7 +70,8 @@ fun BookStoryScreen(
                 title = { Text("Book Type", fontWeight = FontWeight.Bold, color = DarkGray) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로", tint = DarkGray)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로",
+                            tint = DarkGray)
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = BackgroundBeige)
@@ -73,32 +86,33 @@ fun BookStoryScreen(
                 .padding(16.dp),
             contentAlignment = Alignment.Center
         ) {
-            // 카드 전체 영역
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .aspectRatio(0.7f) // 책 비율 설정
+                    .aspectRatio(0.7f)
                     .graphicsLayer {
-                        rotationY = rotation // Y축 기준으로 회전
-                        cameraDistance = 12f * density // 원근감 효과
+                        rotationY = rotation
+                        cameraDistance = 12f * density
                     }
-                    .clickable { isFlipped = !isFlipped } // 클릭 시 뒤집기 상태 토글
             ) {
                 if (rotation <= 90f) {
-                    // 앞면 (Cover) 표시
                     BookCover(
-                        storyData = storyData,
+                        mainPhotoUrl = currentMainPhoto,
+                        month = storyData.month,
+                        onEditClick = { isPhotoPickerOpen = true },
+                        // 👇 [추가] 책을 뒤집는 행동을 넘겨줍니다.
+                        onFlipClick = { isFlipped = !isFlipped },
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {
-                    // 뒷면 (Inside) 표시
-                    // 뒷면은 좌우가 반전되어 보이므로 다시 반전시켜서 정상적으로 보이게 함
                     BookInside(
                         storyData = storyData,
                         onEventClick = { event ->
                             selectedEvent = event
-                            isDialogOpen = true
+                            isEventDialogOpen = true
                         },
+                        // 👇 [추가] 여기도 뒤집는 행동을 넘겨줍니다.
+                        onFlipClick = { isFlipped = !isFlipped },
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer { rotationY = 180f }
@@ -107,23 +121,44 @@ fun BookStoryScreen(
             }
         }
 
-        // 팝업 다이얼로그
-        if (isDialogOpen && selectedEvent != null) {
+        // 이벤트 상세 팝업
+        if (isEventDialogOpen && selectedEvent != null) {
             BookPictureDialog(
                 event = selectedEvent!!,
                 onDismiss = {
-                    isDialogOpen = false
+                    isEventDialogOpen = false
                     selectedEvent = null
                 }
+            )
+        }
+
+        // [추가] 대표 사진 변경 팝업 (그리드 형태)
+        if (isPhotoPickerOpen) {
+            PhotoSelectionDialog(
+                photoUrls = allMonthPhotoUrls,
+                onPhotoSelected = { newUrl ->
+                    currentMainPhoto = newUrl // 사진 변경
+                    isPhotoPickerOpen = false
+
+                    onMainPhotoChanged(newUrl)
+                },
+                onDismiss = { isPhotoPickerOpen = false }
             )
         }
     }
 }
 
 @Composable
-fun BookCover(storyData: StoryBookData, modifier: Modifier = Modifier) {
+fun BookCover(
+    mainPhotoUrl: String,
+    month: String,
+    onEditClick: () -> Unit,
+    onFlipClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Card(
-        modifier = modifier,
+        // 👇 [수정] 카드 전체를 클릭하면 '뒤집기(onFlipClick)'가 실행됩니다.
+        modifier = modifier.clickable { onFlipClick() },
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
@@ -135,31 +170,50 @@ fun BookCover(storyData: StoryBookData, modifier: Modifier = Modifier) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // 메인 사진
-            AsyncImage(
-                model = storyData.mainPhotoUrl,
-                contentDescription = "Main Photo",
-                contentScale = ContentScale.Crop,
+            Box(
                 modifier = Modifier
-                    .weight(1f) // 남은 공간을 모두 사진이 차지
+                    .weight(1f)
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color.LightGray)
-            )
+            ) {
+                AsyncImage(
+                    model = mainPhotoUrl,
+                    contentDescription = "Main Photo",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                // 편집 버튼 (이 버튼을 누르면 뒤집히지 않고 편집 기능만 실행됨)
+                IconButton(
+                    onClick = { onEditClick() },
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .size(36.dp)
+                        .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "표지 변경",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 월 표시 바
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(60.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(BookCoverGreen),
+                    .background(PrimaryBlue),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = storyData.month,
+                    text = month,
                     color = Color.White,
                     fontSize = 24.sp,
                     fontWeight = FontWeight.Bold
@@ -169,14 +223,17 @@ fun BookCover(storyData: StoryBookData, modifier: Modifier = Modifier) {
     }
 }
 
+// [추가] 사진 선택 팝업 (그리드)
 @Composable
 fun BookInside(
     storyData: StoryBookData,
     onEventClick: (StoryEvent) -> Unit,
+    onFlipClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = modifier,
+        // 👇 1. 카드 빈 공간(여백 등)을 클릭하면 뒤집힘
+        modifier = modifier.clickable { onFlipClick() },
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
         colors = CardDefaults.cardColors(containerColor = BookInsideBg)
@@ -197,7 +254,7 @@ fun BookInside(
                     .padding(bottom = 16.dp)
             )
 
-            // 요약글 (특정 단어 클릭 가능하게 처리)
+            // 요약글 구성
             val annotatedString = buildAnnotatedString {
                 var currentIndex = 0
                 val sortedEvents = storyData.events.sortedBy { storyData.summary.indexOf(it.keyword) }
@@ -227,14 +284,28 @@ fun BookInside(
                     color = DarkGray
                 ),
                 onClick = { offset ->
-                    annotatedString.getStringAnnotations(tag = "EVENT", start = offset, end = offset)
-                        .firstOrNull()?.let { annotation ->
-                            storyData.events.find { it.keyword == annotation.item }?.let { event ->
-                                onEventClick(event)
-                            }
+                    // 👇 2. 여기가 핵심 수정 부분입니다!
+
+                    // 파란 글씨(키워드)를 눌렀는지 확인
+                    val clickedAnnotation = annotatedString.getStringAnnotations(tag = "EVENT",
+                        start = offset, end = offset).firstOrNull()
+
+                    if (clickedAnnotation != null) {
+                        // (A) 키워드를 눌렀으면 -> 팝업 띄우기
+                        storyData.events.find { it.keyword == clickedAnnotation.item }?.let { event ->
+                            onEventClick(event)
                         }
-                }
+                    } else {
+                        // (B) 키워드가 아닌 일반 글씨를 눌렀으면 -> 책 뒤집기 실행!
+                        onFlipClick()
+                    }
+                },
+                // ClickableText가 가로로 꽉 차게 해서 터치 영역을 확실히 잡도록 함
+                modifier = Modifier.fillMaxWidth()
             )
+
+            // 글씨 아래 남는 공간도 클릭하면 뒤집히도록 투명 박스 추가
+            Spacer(modifier = Modifier.weight(1f).fillMaxWidth().clickable { onFlipClick() })
         }
     }
 }
@@ -277,25 +348,45 @@ fun BookPictureDialog(
     )
 }
 
-// 나중에 수정
-@Preview(showBackground = true)
 @Composable
-fun BookStoryScreenPreview() {
-    val sampleData = StoryBookData(
-        month = "2025.02",
-        mainPhotoUrl = "https://picsum.photos/id/1011/400/400",
-        summary = """
-            이번 한 달은 사소한 변화들이 모여 아이의 성장을 또렷하게 보여준 시간이었다.
-            
-            손에 쥐는 힘이 한층 단단해지고, 배밀이·앉기·놀이 같은 작은 시도들이 눈에 띄게 늘었다.
-            
-            표정도 한결 다양해져 웃음도, 호기심 어린 집중도, 새로운 환경에 대한 설렘도 자주 드러났다.
-        """.trimIndent(),
-        events = listOf(
-            StoryEvent("배밀이", listOf("https://picsum.photos/id/1025/400/300"), "아이의 배밀이 사진"),
-            StoryEvent("앉기", listOf("https://picsum.photos/id/1005/400/300"), "혼자 앉아있는 모습"),
-            StoryEvent("놀이", listOf("https://picsum.photos/id/1016/400/300"), "장난감 가지고 노는 시간")
-        )
+fun PhotoSelectionDialog(
+    photoUrls: List<String>,
+    onPhotoSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.White,
+        title = {
+            Text(text = "표지 사진 선택", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        },
+        text = {
+            // 사진이 많을 수 있으니 그리드(바둑판) 모양으로 보여줌
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3), // 한 줄에 3개씩
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.heightIn(max = 400.dp)
+            ) {
+                // items import가 안 되어 있다면 빨간 줄이 뜰 수 있습니다.
+                // import androidx.compose.foundation.lazy.grid.items 를 추가하세요.
+                items(photoUrls) { url ->
+                    AsyncImage(
+                        model = url,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .aspectRatio(1f) // 정사각형 비율
+                            .clip(RoundedCornerShape(4.dp))
+                            .clickable { onPhotoSelected(url) } // 클릭하면 선택된 사진 주소를 넘겨줌
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("취소", color = Color.Gray)
+            }
+        }
     )
-    BookStoryScreen(storyData = sampleData, onBack = {})
 }
