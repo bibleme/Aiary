@@ -54,7 +54,7 @@ data class DaySummaryRequest(
 
 data class FullDiaryResponse(
     val status: String,
-    val full_diary: String?, // KoBART가 만든 줄글 일기
+    val full_diary: String?,
     val bullet_lines: List<String>?,
     val combined_summary: String?
  )
@@ -62,8 +62,7 @@ data class FullDiaryResponse(
 
 // 비밀번호 변경 요청
 data class ChangePasswordRequest(
-    val email: String,
-    val current_password: String,
+    val old_password: String,
     val new_password: String
 )
 
@@ -73,5 +72,14 @@ data class DiaryResponse(
     val user_id: Int,
     val content: String,
     val image_url: String,
-    val created_at: String
+    val created_at: String,
+
+    @SerializedName("diary_date")
+    val diary_date: String? = null
+)
+
+data class DeleteAccountResponse(
+    val message: String,
+    val relogin_required: Boolean,
+    val error_code: String
 )
