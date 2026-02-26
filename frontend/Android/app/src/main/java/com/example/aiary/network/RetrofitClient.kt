@@ -4,7 +4,7 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import java.util.concurrent.TimeUnit // 👈 이 import가 꼭 필요합니다!
+import java.util.concurrent.TimeUnit
 
 // 통신 기계 (RetrofitClient)
 object RetrofitClient {
