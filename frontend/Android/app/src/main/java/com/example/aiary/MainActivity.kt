@@ -50,6 +50,24 @@ class MainActivity : ComponentActivity() {
                 // 0: 로그인, 1: 홈, 2: 업로드, 3: 회원가입
                 var currentScreen by remember { mutableIntStateOf(0) }
 
+                // 앱이 켜질 때 딱 한 번 실행되는 검사기 (LaunchedEffect)
+                LaunchedEffect(Unit) {
+                    val sharedPref = context.getSharedPreferences("aiary_prefs",
+                        android.content.Context.MODE_PRIVATE)
+                    val savedToken = sharedPref.getString("accessToken", null)
+                    val savedUserId = sharedPref.getInt("userId", -1)
+                    val savedEmail = sharedPref.getString("userEmail", "")
+
+                    // 저장된 토큰이 있다면? -> UserSession을 복구하고 바로 홈 화면으로!
+                    if (savedToken != null && savedUserId != -1) {
+                        UserSession.accessToken = savedToken
+                        UserSession.userId = savedUserId
+                        UserSession.userEmail = savedEmail ?: ""
+                        currentScreen = 1 // 0(로그인)을 건너뛰고 바로 1(홈)로 이동
+                    }
+                }
+
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = BackgroundBeige,
@@ -65,8 +83,14 @@ class MainActivity : ComponentActivity() {
                                 onLogout = {
                                     // 로그아웃 시 아이디, 이메일, 토큰 기억을 비움
                                     UserSession.clear()
+                                    // 핸드폰 창고도 싹 비우기!
+                                    val sharedPref = context.getSharedPreferences("aiary_prefs",
+                                        android.content.Context.MODE_PRIVATE)
+                                    sharedPref.edit().clear().apply()
+
                                     currentScreen = 0
-                                    Toast.makeText(context, "로그아웃 되었습니다.", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "로그아웃 되었습니다.",
+                                        Toast.LENGTH_SHORT).show()
                                 }
                             )
                             2 -> ImageUploadScreen(onBack = { currentScreen = 1 })
@@ -169,16 +193,22 @@ fun LoginScreen(
                             val accessToken = body?.access_token
 
                             if (accessToken != null) {
-                                // JWT 토큰에서 user_id 추출하기
+                                // ⭐ JWT 토큰에서 user_id 추출하기
                                 val userId = getUserIdFromToken(accessToken)
                                 UserSession.userId = userId
                                 UserSession.userEmail = email  // 입력했던 이메일 저장
                                 UserSession.accessToken = accessToken
 
-                                Toast.makeText(context, "로그인 성공! (User ID: $userId)",
-                                    Toast.LENGTH_SHORT).show()
+                                // 👇 [여기가 추가된 부분입니다!] 핸드폰 창고(SharedPreferences)에 정보 저장하기
+                                val sharedPref = context.getSharedPreferences("aiary_prefs", android.content.Context.MODE_PRIVATE)
+                                with(sharedPref.edit()) {
+                                    putString("accessToken", accessToken)
+                                    putInt("userId", userId)
+                                    putString("userEmail", email)
+                                    apply() // 이걸 꼭 해야 저장이 완료됩니다.
+                                }
 
-                                // TODO: 나중엔 accessToken과 userId를 Preference에 저장해야 함
+                                Toast.makeText(context, "로그인 성공! (User ID: $userId)", Toast.LENGTH_SHORT).show()
 
                                 onLoginSuccess() // 홈으로 이동
                             } else {
