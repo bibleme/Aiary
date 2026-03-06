@@ -2,190 +2,204 @@
 from __future__ import annotations
 
 import os
+import re
+import gc
 from pathlib import Path
 from typing import List, Dict
 
 import torch
-import regex as re
 import emoji
-from transformers import BartForConditionalGeneration, PreTrainedTokenizerFast
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 
-# 1) 모델 / 토크나이저 경로 설정
-
-# 이 파일 위치: app/services/daily_diary_generator.py
-# BASE_DIR: 프로젝트 루트 (Aiary/) 를 가리키도록 설정
+# -------------------------------------------------------------------
+# 1) 경로 및 디바이스 설정
+# -------------------------------------------------------------------
+# BASE_DIR: backend 폴더를 가리킵니다.
 BASE_DIR = Path(__file__).resolve().parents[2]
 
-# 모델이 저장된 디렉터리
-#   Aiary/
-#     └─ models/
-#          └─ day_diary_from_summary_v2/
-MODEL_DIR = BASE_DIR / "models" / "day_diary_from_summary_v2"
+# ✅ LLM 담당자님이 전달해주신 최종 모델 경로 (kobart_student_round5)
+MODEL_DIR = BASE_DIR / "models" / "kobart_student_round5"
 
-# 인코딩/디코딩 길이 제한
-MAX_INPUT_LEN = 256
-MAX_TARGET_LEN = 220
-
-# lazy-loading 을 위한 전역 변수 (최초 1회만 로드)
+# lazy-loading 을 위한 전역 변수
 _tokenizer = None
 _model = None
 _device = None
 
+def get_device():
+    if torch.cuda.is_available(): return torch.device("cuda")
+    if torch.backends.mps.is_available(): return torch.device("mps")
+    return torch.device("cpu")
+
+def cleanup_torch():
+    gc.collect()
+    if torch.cuda.is_available(): torch.cuda.empty_cache()
+    if torch.backends.mps.is_available():
+        try: torch.mps.empty_cache()
+        except: pass
 
 def _load_model_if_needed():
-    """
-    KoBART 토크나이저와 모델을 **최초 1번만** 로드하는 함수.
-
-    - FastAPI 서버 띄운 후 첫 호출에서만 모델을 실제로 로드.
-    - 이후 호출에서는 이미 로드된 전역 객체를 재사용해서 속도/메모리 절약.
-    """
+    """FastAPI 서버가 켜진 후 최초 1회만 모델을 로드하여 속도를 최적화합니다."""
     global _tokenizer, _model, _device
 
     if _model is not None and _tokenizer is not None:
-        # 이미 로딩된 상태라면 그대로 사용
         return
 
     if not MODEL_DIR.exists():
-        raise FileNotFoundError(f"하루일기 모델 디렉토리를 찾을 수 없습니다: {MODEL_DIR}")
+        raise FileNotFoundError(f"AI 모델 경로를 찾을 수 없습니다: {MODEL_DIR}")
 
-    print("[INFO] 하루일기 모델 / 토크나이저 로드 중...", flush=True)
+    print("[INFO] 하루일기 AI 모델 로드 중...", flush=True)
 
-    # HuggingFace Transformers 형식으로 저장된 디렉터리에서 바로 로드
-    _tokenizer = PreTrainedTokenizerFast.from_pretrained(str(MODEL_DIR))
-    _model = BartForConditionalGeneration.from_pretrained(str(MODEL_DIR))
-
-    # pad_token 이 없으면 eos_token을 pad 로 사용
-    if _tokenizer.pad_token is None:
-        _tokenizer.pad_token = _tokenizer.eos_token
-
-    # GPU가 있으면 cuda, 없으면 cpu 사용
-    _device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    _model.to(_device)
+    _device = get_device()
+    _tokenizer = AutoTokenizer.from_pretrained(str(MODEL_DIR), use_fast=True)
+    _model = AutoModelForSeq2SeqLM.from_pretrained(str(MODEL_DIR)).to(_device)
     _model.eval()
 
     print(f"[INFO] device = {_device}", flush=True)
-    print("[INFO] 하루일기 모델 로드 완료", flush=True)
+    print("[INFO] AI 모델 로드 완료!", flush=True)
 
-
-# 2) 텍스트 정제 함수들
-
+# -------------------------------------------------------------------
+# 2) 텍스트 전처리 (v5 코드의 꼼꼼한 노이즈 제거 + 이모지 제거)
+# -------------------------------------------------------------------
 def _remove_emoji(text: str) -> str:
-    """이모지 제거 (emoji 라이브러리 + regex 기반 이중 처리)."""
     text = emoji.replace_emoji(text, "")
-    emoji_pattern = re.compile(
-        r"[\p{Emoji}\p{Emoji_Presentation}\p{Extended_Pictographic}]",
-        flags=re.UNICODE,
-    )
+    emoji_pattern = re.compile(r"[\p{Emoji}\p{Emoji_Presentation}\p{Extended_Pictographic}]", flags=re.UNICODE)
     return emoji_pattern.sub("", text)
 
+def normalize_space(s: str):
+    if not s: return ""
+    s = _remove_emoji(s)
+    s = s.replace("\u200b", " ")
+    s = re.sub(r"[ \t]+", " ", s)
+    s = re.sub(r"\n{3,}", "\n\n", s)
+    return s.strip()
 
-def _clean_sentence(text: str) -> str:
-    """한 줄 일기 문장을 모델 입력에 맞게 간단히 정제."""
-    text = str(text)
-    text = _remove_emoji(text)
-    text = re.sub(r"\s+", " ", text)
-    return text.strip()
+def normalize_joined(s: str):
+    if not s: return ""
+    s = s.strip().replace("에서에서", "에서").replace("있다하다가", "있다가").replace("해본다하더니", "해보더니")
+    s = re.sub(r"\s*을\(를\)\s*", " ", s)
+    s = re.sub(r"[ \t]{2,}", " ", s)
+    s = re.sub(r"\n{3,}", "\n\n", s)
+    return s.strip()
 
+def safe_join_one_lines(one_lines: List[str]):
+    return "\n".join([normalize_space(x) for x in one_lines if x and str(x).strip()])
 
-def build_summary_bullets(one_line_list: List[str]) -> Dict[str, object]:
-    """
-    여러 개의 한 줄 일기를 받아서:
-      - 정제(clean)
-      - '1. 문장' 형식 bullet 리스트
-      - bullet들을 합친 combined_summary 문자열
+# -------------------------------------------------------------------
+# 3) 텍스트 후처리 (v5 코드의 핵심: AI 헛소리 및 반복 방지 필터)
+# -------------------------------------------------------------------
+_SENT_END = r"[.!?。！？]"
+_SENT_SPLIT_RE = re.compile(rf"(?<={_SENT_END})\s+|\n+")
 
-    을 만들어 돌려줌.
-    """
-    cleaned = [_clean_sentence(s) for s in one_line_list if str(s).strip()]
-    if not cleaned:
-        raise ValueError("one_line_list 안에 유효한 문장이 없습니다.")
+def split_sentences(text):
+    t = normalize_space(text or "")
+    if not t: return []
+    return [x.strip() for x in _SENT_SPLIT_RE.split(t) if x.strip()]
 
-    bullet_lines = [f"{i}. {sent}" for i, sent in enumerate(cleaned, start=1)]
-    combined_summary = "\n".join(bullet_lines)
+def ensure_ends_with_sentence(text: str) -> str:
+    if not text: return ""
+    t = text.strip()
+    if re.search(rf"{_SENT_END}\s*$", t): return t
+    last = max(t.rfind("."), t.rfind("!"), t.rfind("?"), t.rfind("。"), t.rfind("！"), t.rfind("？"))
+    if last != -1 and last >= 20:
+        t = t[: last + 1].strip()
+        if re.search(rf"{_SENT_END}\s*$", t): return t
+    if len(t) >= 30: return (t + ".").strip()
+    return t.strip()
 
-    return {
-        "cleaned_sentences": cleaned,
-        "bullet_lines": bullet_lines,
-        "combined_summary": combined_summary,
-    }
+def cut_to_max_sentences(text: str, max_sents: int = 11) -> str:
+    sents = split_sentences(text)
+    if len(sents) <= max_sents: return ensure_ends_with_sentence(" ".join(sents).strip())
+    return ensure_ends_with_sentence(" ".join(sents[:max_sents]).strip())
 
+def _norm_sent_for_dup(s: str) -> str:
+    return re.sub(r"[^0-9A-Za-z가-힣]", "", re.sub(r"\s+", "", s))
 
-# 3) 요약 -> 하루일기 생성 (실제 KoBART 호출)
+def cut_after_duplicate_sentence(text: str, min_chars: int = 12) -> str:
+    sents = split_sentences(text)
+    if len(sents) <= 1: return ensure_ends_with_sentence(" ".join(sents).strip())
+    seen = set()
+    kept = []
+    for s in sents:
+        key = _norm_sent_for_dup(s)
+        if len(key) >= min_chars:
+            if key in seen: break
+            seen.add(key)
+        kept.append(s)
+    return ensure_ends_with_sentence(" ".join(kept).strip())
 
-def generate_diary_from_summary(summary_text: str, max_len: int = MAX_TARGET_LEN) -> str:
-    """
-    summary_text: '1. ~\\n2. ~\\n3. ~' 형태의 요약 문자열
-    return: KoBART가 생성한 하루 일기 텍스트
-    """
+def has_repeated_4gram(sentence: str, min_repeats: int = 2) -> bool:
+    toks = re.findall(r"[가-힣]{1,}|[A-Za-z]{1,}|[0-9]+", sentence or "")
+    if len(toks) < 8: return False
+    cnt = {}
+    for i in range(len(toks) - 4 + 1):
+        g = tuple(toks[i:i+4])
+        cnt[g] = cnt.get(g, 0) + 1
+        if cnt[g] >= min_repeats: return True
+    return False
+
+def drop_sentences_with_repeated_4gram(text: str) -> str:
+    sents = split_sentences(text)
+    kept = [s for s in sents if not has_repeated_4gram(s, min_repeats=2)]
+    return ensure_ends_with_sentence(" ".join(kept).strip())
+
+def postprocess_diary(text: str, max_sents: int = 11) -> str:
+    t = normalize_space(text or "")
+    t = ensure_ends_with_sentence(t)
+    t = drop_sentences_with_repeated_4gram(t)
+    t = cut_after_duplicate_sentence(t)
+    t = cut_to_max_sentences(t, max_sents=max_sents)
+    return ensure_ends_with_sentence(t).strip()
+
+# -------------------------------------------------------------------
+# 4) AI 생성 로직 및 FastAPI 비동기 래퍼
+# -------------------------------------------------------------------
+def _run_generation_sync(one_line_list: List[str]) -> str:
+    """실제 AI 모델을 돌리는 동기 함수"""
     _load_model_if_needed()
 
-    # 학습 때 사용했던 포맷을 맞춰줌
-    input_text = f"[SUMMARY]\n{summary_text}\n[DIARY]"
+    src = normalize_joined(safe_join_one_lines(one_line_list))
+    if not src:
+        raise ValueError("유효한 메모가 없습니다.")
 
-    enc = _tokenizer(
-        input_text,
-        max_length=MAX_INPUT_LEN,
-        padding="max_length",
-        truncation=True,
-        return_tensors="pt",
-    )
+    enc = _tokenizer(src, return_tensors="pt", truncation=True, max_length=512)
+    enc = {k: v.to(_device) for k, v in enc.items()}
+    enc.pop("token_type_ids", None)
 
-    input_ids = enc["input_ids"].to(_device)
-    attention_mask = enc["attention_mask"].to(_device)
-
-    with torch.no_grad():
-        outputs = _model.generate(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            max_new_tokens=max_len,
-            min_length=40,
-            no_repeat_ngram_size=3,
-            repetition_penalty=2.0,
-            do_sample=True,
-            temperature=0.6,
-            top_p=0.9,
+    with torch.inference_mode():
+        out = _model.generate(
+            **enc,
+            max_new_tokens=180,
+            min_new_tokens=0,
+            num_beams=2,
+            do_sample=False,
             early_stopping=True,
+            no_repeat_ngram_size=4,
+            repetition_penalty=1.10,
+            length_penalty=0.85,
             eos_token_id=_tokenizer.eos_token_id,
+            pad_token_id=_tokenizer.pad_token_id
         )
 
-    pred = _tokenizer.decode(outputs[0], skip_special_tokens=True)
-    pred = pred.replace("[DIARY]", "").strip()
-    return pred
-
-
-# 4) FastAPI에서 쓸 비동기 래퍼
+    raw_text = _tokenizer.decode(out[0], skip_special_tokens=True)
+    final_text = postprocess_diary(raw_text, max_sents=11)
+    cleanup_torch()
+    return final_text
 
 async def generate_daily_diary(one_line_list: List[str]) -> Dict[str, object]:
     """
-    FastAPI 엔드포인트에서 호출할 비동기 래퍼.
-
-    - one_line_list: DB에서 가져온 '한 줄 일기' 문자열 리스트
-    - 내부에서:
-        1) build_summary_bullets 로 bullet 요약 생성
-        2) generate_diary_from_summary 로 KoBART 줄글 생성
-    - 반환:
-        {
-          "generated_diary": "줄글 텍스트 ...",
-          "bullet_lines": ["1. ...", "2. ...", ...],
-          "combined_summary": "1. ...\\n2. ...\\n..."
-        }
+    FastAPI 라우터에서 호출할 최종 비동기 함수.
+    새로운 DB 스키마(DailyDiary)의 컬럼명에 맞춰 반환합니다.
     """
-    from anyio import to_thread  # anyio는 FastAPI에 기본 포함
+    from anyio import to_thread
 
     def _run():
-        # 1) 한 줄 일기들로부터 bullet 요약 생성
-        summary_info = build_summary_bullets(one_line_list)
-
-        # 2) KoBART 호출 -> 하루 줄글 일기 생성
-        diary_text = generate_diary_from_summary(summary_info["combined_summary"])
-
+        diary_text = _run_generation_sync(one_line_list)
+        # ✅ API 라우터(diary.py)가 받을 수 있게 딕셔너리로 반환!
         return {
-            "generated_diary": diary_text,
-            "bullet_lines": summary_info["bullet_lines"],
-            "combined_summary": summary_info["combined_summary"],
+            "content": diary_text,
+            "source_count": len(one_line_list)
         }
 
-    # 모델 추론은 CPU/GPU 연산이므로,
-    # 메인 event loop 를 막지 않도록 쓰레드 풀에서 실행
+    # 서버 성능 저하를 막기 위해 별도 쓰레드에서 실행
     result = await to_thread.run_sync(_run)
     return result

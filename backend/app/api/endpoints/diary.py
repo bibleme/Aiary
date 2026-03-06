@@ -106,6 +106,9 @@ async def _get_daily_diary(
     return result.scalar_one_or_none()
 
 
+# -------------------------------------------------------------------
+# 1) 한 줄 일기 관련 API
+# -------------------------------------------------------------------
 @router.post("/diaries/", response_model=OneLineDiaryResponse)
 async def create_diary(
     photo: UploadFile = File(...),
@@ -211,6 +214,48 @@ async def get_one_line_diary(
     return _serialize_diary(diary)
 
 
+@router.delete("/diaries/{diary_id}")
+async def delete_diary(
+    diary_id: int,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        result = await db.execute(
+            select(Diary).where(
+                Diary.id == diary_id,
+                Diary.user_id == current_user.id,
+            )
+        )
+        diary = result.scalar_one_or_none()
+
+        if diary is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="해당 일기가 존재하지 않습니다.",
+            )
+
+        await db.delete(diary)
+        await db.commit()
+
+        return {
+            "status": "success",
+            "deleted_diary_id": diary_id,
+            "message": "한줄일기가 삭제되었습니다.",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Diary delete failed: {e}",
+        )
+
+
+# -------------------------------------------------------------------
+# 2) AI 하루 일기(Daily Diary) 관련 API
+# -------------------------------------------------------------------
 @router.post("/daily-diaries/", response_model=DailyDiaryResponse)
 async def create_daily_diary(
     payload: DaySummaryRequest,
@@ -234,11 +279,13 @@ async def create_daily_diary(
 
         one_lines = [diary.content for diary in diaries]
 
-        # 하루일기 생성
+        # 하루일기 생성 (AI 연산 호출)
         gen_result = await generate_daily_diary(one_lines)
-        full_diary = gen_result["generated_diary"]
+        
+        # ✅ 방금 우리가 수정한 AI 함수의 반환 키("content") 적용!
+        full_diary = gen_result["content"]
 
-        # 최초 생성 결과를 저장
+        # 최초 생성 결과를 DB에 저장
         new_daily_diary = DailyDiary(
             user_id=current_user.id,
             diary_date=target_date,
@@ -307,9 +354,11 @@ async def regenerate_daily_diary(
 
         one_lines = [diary.content for diary in diaries]
 
-        # 명시적으로 다시 생성
+        # 명시적으로 다시 생성 (AI 연산 재호출)
         gen_result = await generate_daily_diary(one_lines)
-        full_diary = gen_result["generated_diary"]
+        
+        # ✅ 여기도 "content" 키로 맞춰서 값을 빼옵니다!
+        full_diary = gen_result["content"]
 
         existing = await _get_daily_diary(db, current_user.id, target_date)
 
@@ -320,7 +369,7 @@ async def regenerate_daily_diary(
             await db.refresh(existing)
             return _serialize_daily_diary(existing)
 
-        # 기존 데이터가 없으면 새로 생성
+        # 혹시 기존 데이터가 없으면 새로 생성해서 저장
         new_daily_diary = DailyDiary(
             user_id=current_user.id,
             diary_date=target_date,
@@ -339,43 +388,4 @@ async def regenerate_daily_diary(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Daily diary regenerate failed: {e}",
-        )
-
-
-@router.delete("/diaries/{diary_id}")
-async def delete_diary(
-    diary_id: int,
-    db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
-):
-    try:
-        result = await db.execute(
-            select(Diary).where(
-                Diary.id == diary_id,
-                Diary.user_id == current_user.id,
-            )
-        )
-        diary = result.scalar_one_or_none()
-
-        if diary is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="해당 일기가 존재하지 않습니다.",
-            )
-
-        await db.delete(diary)
-        await db.commit()
-
-        return {
-            "status": "success",
-            "deleted_diary_id": diary_id,
-            "message": "한줄일기가 삭제되었습니다.",
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Diary delete failed: {e}",
         )
