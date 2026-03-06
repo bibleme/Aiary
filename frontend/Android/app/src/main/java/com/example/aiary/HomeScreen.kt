@@ -58,35 +58,40 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 
 private val White = Color(0xFFFFFFFF)
 
-@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun HomeScreen(onNavigateToUpload: () -> Unit,
                onLogout: () -> Unit) {
     val context = LocalContext.current
-    // 핸드폰 저장소(SharedPreferences) 불러오기
     val sharedPreferences = remember {
         context.getSharedPreferences("aiary_prefs", Context.MODE_PRIVATE)
+    }
+
+    // 👇 [핵심 1] 현재 로그인한 사람의 ID를 가져옵니다 (예: 5, 6)
+    val myId = UserSession.userId
+
+    // 로그아웃 시 (이제 저장소 초기화 clear() 안 합니다!)
+    val handleLogout = {
+        onLogout()
     }
 
     var selectedItem by remember { mutableIntStateOf(0) }
     val items = listOf("홈", "카드형", "리포트", "마이페이지")
     val icons = listOf(Icons.Filled.Home, Icons.Filled.List, Icons.Filled.DateRange, Icons.Filled.Person)
 
-    // 저장소에서 값 불러오기 (없으면 기본값)
-    // 이름 불러오기
+    // 👇 [핵심 2] 불러올 때 "baby_name_5" 처럼 뒤에 myId를 붙여서 내 것만 쏙 빼옵니다!
     var sharedBabyName by remember {
-        mutableStateOf(sharedPreferences.getString("baby_name", "시우") ?: "시우")
+        mutableStateOf(sharedPreferences.getString("baby_name_$myId", "@@") ?: "@@")
     }
-    // 생일 불러오기
     var sharedBabyBirthDate by remember {
-        mutableStateOf(sharedPreferences.getString("baby_birth", "2024-01-01") ?: "2024-01-01")
+        mutableStateOf(sharedPreferences.getString("baby_birth_$myId", "2024-01-01") ?: "2024-01-01")
     }
-    // 사진 주소 불러오기
     var sharedProfileUri by remember {
-        val uriString = sharedPreferences.getString("baby_photo", null)
+        val uriString = sharedPreferences.getString("baby_photo_$myId", null)
         mutableStateOf(if (uriString != null) Uri.parse(uriString) else null)
     }
 
@@ -197,7 +202,7 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                     var reportList by remember { mutableStateOf<List<StoryBookData>>(emptyList()) }
                     var selectedReport by remember { mutableStateOf<StoryBookData?>(null) }
 
-                    // 각 월(Month)별 전체 사진들을 저장해둘 공간 (표지 변경 기능에 쓰임)
+                    // [추가] 각 월(Month)별 전체 사진들을 저장해둘 공간 (표지 변경 기능에 쓰임)
                     var monthPhotosMap by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
 
                     LaunchedEffect(Unit) {
@@ -209,10 +214,14 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
 
                                 if (diaries.isNotEmpty()) {
                                     // 1. 서버에서 온 일기들을 "YYYY.MM" (예: 2025.12) 단위로 그룹화(묶기) 합니다.
+                                    // 👇 [수정 후]
                                     val groupedDiaries = diaries.groupBy { diary ->
-                                        if (diary.created_at.length >= 7) {
-                                            // "2025-12-11T..." -> "2025-12" -> "2025.12"
-                                            diary.created_at.substring(0, 7).replace("-", ".")
+                                        // 👇 date 대신 데이터 클래스에 있는 diary_date를 사용합니다!
+                                        // 만약 diary_date가 비어있을(null) 경우를 대비해 created_at을 예비용으로 쓰도록 안전장치(?:)도 걸어두었습니다.
+                                        val targetDate = diary.diary_date ?: diary.created_at
+
+                                        if (targetDate.length >= 7) {
+                                            targetDate.substring(0, 7).replace("-", ".")
                                         } else {
                                             "알 수 없음"
                                         }
@@ -241,7 +250,8 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                                             StoryBookData(
                                                 month = monthStr, // "2025.12" 등
                                                 mainPhotoUrl = photoUrls.last(), // 가장 최근 사진을 표지로
-                                                summary = "${monthStr}의 소중한 추억들입니다. (총 ${monthDiaries.size}개의 기록)", // 임시 요약글
+                                                summary = "${monthStr}의 소중한 추억들입니다. " +
+                                                        "(총 ${monthDiaries.size}개의 기록)", // 임시 요약글
                                                 events = events
                                             )
                                         )
@@ -278,25 +288,26 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                 }
                 3 -> {
                     MyPageScreen(
-                        onLogout = onLogout,
+                        onLogout = handleLogout,
+                        onDeleteAccount = onLogout,
                         currentBabyName = sharedBabyName,
                         currentBabyBirthDate = sharedBabyBirthDate,
                         currentProfileUri = sharedProfileUri,
-                        // 정보가 바뀔 때마다 저장소(Preferences)에도 저장
                         onUpdateProfile = { newName, newDate ->
                             sharedBabyName = newName
                             sharedBabyBirthDate = newDate
 
-                            // 영구 저장
+                            // 👇 [핵심 3] 저장할 때도 "baby_name_5" 이런 식으로 내 서랍에 저장!
                             sharedPreferences.edit()
-                                .putString("baby_name", newName)
-                                .putString("baby_birth", newDate)
+                                .putString("baby_name_$myId", newName)
+                                .putString("baby_birth_$myId", newDate)
                                 .apply()
                         },
                         onUpdateProfileImage = { newUri ->
                             try {
                                 val inputStream = context.contentResolver.openInputStream(newUri)
-                                val file = File(context.filesDir, "baby_profile.jpg")
+                                // 👇 [핵심 4] 사진 파일 이름도 "baby_profile_5.jpg" 처럼 안 겹치게 만듭니다!
+                                val file = File(context.filesDir, "baby_profile_$myId.jpg")
                                 val outputStream = FileOutputStream(file)
 
                                 inputStream?.copyTo(outputStream)
@@ -304,14 +315,14 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                                 outputStream.close()
 
                                 val savedUri = Uri.fromFile(file)
-
                                 sharedProfileUri = savedUri
+
                                 sharedPreferences.edit()
-                                    .putString("baby_photo", savedUri.toString())
+                                    .putString("baby_photo_$myId", savedUri.toString())
                                     .apply()
 
                             } catch (e: Exception) {
-                                e.printStackTrace() // 복사 실패 시 로그 출력
+                                e.printStackTrace()
                             }
                         }
                     )
@@ -323,36 +334,42 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
 
 @Composable
 fun ReportListScreen(
-    reports: List<StoryBookData>, // 리포트 목록 데이터
+    reports: List<StoryBookData>,
     onReportClick: (StoryBookData) -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(BackgroundBeige)
-            .padding(24.dp)
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "추억 보관함 📚",
+            text = "우리아이 추억 쌓기 📚",
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = DarkGray,
-            modifier = Modifier.padding(bottom = 24.dp)
+            modifier = Modifier
+                .align(Alignment.Start)
+                .padding(bottom = 32.dp)
         )
 
         if (reports.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("아직 생성된 리포트가 없어요.", color = Color.Gray)
+                Text("아직 쌓인 추억이 없어요.", color = Color.Gray)
             }
         } else {
-            // 2칸짜리 격자 모양 책장
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalArrangement = Arrangement.spacedBy(24.dp)
+            LazyColumn(
+                // 👇 [핵심 1] weight(1f)를 주어 화면 아래 빈 공간을 끝까지 쫙 밀고 내려가게 합니다.
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+
+                // 👇 [핵심 2] Alignment.Bottom을 추가해서 책 전체 뭉치를 바닥으로 끌어내립니다!
+                verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.Bottom)
             ) {
-                items(reports) { report ->
-                    ReportItem(report = report, onClick = { onReportClick(report) })
+                // 👇 [핵심 3] 원래 순서대로(최신이 위로 오게) 그리기 위해 .reversed()는 뺍니다!
+                itemsIndexed(reports) { index, report ->
+                    StackedBookItem(report = report, index = index, onClick = { onReportClick(report) })
                 }
             }
         }
@@ -360,47 +377,49 @@ fun ReportListScreen(
 }
 
 @Composable
-fun ReportItem(
+fun StackedBookItem(
     report: StoryBookData,
+    index: Int,
     onClick: () -> Unit
 ) {
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
+    // 책등 색상 팔레트
+    val bookColors = listOf(
+        Color(0xFFF2B8B5), // 인디 핑크
+        Color(0xFFE6C2A5), // 피치 오렌지
+        Color(0xFFA8C8A6), // 민트 그린
+        Color(0xFFB5C0D0), // 소프트 블루
+        Color(0xFFD3B8D8)  // 라벤더
+    )
+    val backgroundColor = bookColors[index % bookColors.size]
+
+    // 가로 길이 (삐뚤빼뚤하게)
+    val widthFraction = if (index % 2 == 0) 0.85f else 0.95f
+
+    // 책 두께(높이)를 다양하게 리스트로 만듭니다!
+    val bookHeights = listOf(45.dp, 65.dp, 50.dp, 75.dp, 55.dp)
+    // 인덱스에 맞춰서 두께를 하나씩 꺼내옵니다.
+    val currentThickness = bookHeights[index % bookHeights.size]
+
+    Card(
+        shape = RoundedCornerShape(6.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(containerColor = backgroundColor),
         modifier = Modifier
+            .fillMaxWidth(widthFraction)
+            // 고정값 대신 위에서 만든 변수를 넣어줍니다!
+            .height(currentThickness)
             .clickable { onClick() }
     ) {
-        // 책 표지 모양 (그림자 효과)
-        Card(
-            shape = RoundedCornerShape(8.dp), // 책은 둥근 모서리가 적게
-            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(0.7f) // 책 비율 (세로로 긴 형태)
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
         ) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                AsyncImage(
-                    model = report.mainPhotoUrl,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-                // 책등 효과 (왼쪽에 살짝 음영을 줘서 책처럼 보이게 함)
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .width(6.dp)
-                        .background(Color.Black.copy(alpha = 0.2f))
-                        .align(Alignment.CenterStart)
-                )
-            }
+            Text(
+                text = "${report.month}의 기록",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = DarkGray
+            )
         }
-        Spacer(modifier = Modifier.height(8.dp))
-        // 연월 표시 (예: 2025.12)
-        Text(
-            text = report.month,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Bold,
-            color = DarkGray
-        )
     }
 }
