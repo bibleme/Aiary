@@ -1,5 +1,4 @@
 # app/schemas/user.py
-
 import datetime
 from pydantic import BaseModel, EmailStr, Field
 
@@ -26,7 +25,7 @@ class UserResponse(UserBase):
     created_at: datetime.datetime
 
     class Config:
-        from_attributes = True  # pydantic v2
+        from_attributes = True
 
 
 class PasswordChangeRequest(BaseModel):
