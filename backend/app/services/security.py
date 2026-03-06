@@ -14,7 +14,7 @@ from app.db.database import get_db_session
 from app.db.model import User
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/users/token")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
