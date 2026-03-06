@@ -40,7 +40,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import androidx.compose.ui.res.painterResource
+import androidx.compose.material.icons.filled.Edit
 
+// 색상 정의 (필요시 PrimaryBlue 등 추가)
 private val White = Color(0xFFFFFFFF)
 
 // 삭제를 위해 서버의 고유 ID(id)를 추가로 받습니다.
@@ -186,7 +188,24 @@ fun CardDiaryScreen(
                                 }
                             )
                         } else {
-                            BackSideContent(fullDiaryText)
+                            BackSideContent(
+                                fullDiaryText = fullDiaryText,
+                                onSaveClick = { updatedText ->
+                                    // 화면에 보이는 글씨를 즉시 바뀐 글로 업데이트합니다.
+                                    fullDiaryText = updatedText
+
+                                    // 서버에 바뀐 글을 전송합니다 (임시 코드)
+                                    coroutineScope.launch {
+                                        try {
+                                            // RetrofitClient.api.updateFullDiary(...) 같은 통신 코드
+
+                                            Toast.makeText(context, "일기가 수정되었습니다!", Toast.LENGTH_SHORT).show()
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "수정 저장 실패", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                }
+                            )
                         }
                     }
                 }
@@ -230,10 +249,10 @@ fun CardDiaryScreen(
                         coroutineScope.launch {
                             try {
                                 val myId = UserSession.userId
-                                val response = RetrofitClient.api.deleteDiary(deleteId, myId) 
+                                val response = RetrofitClient.api.deleteDiary(deleteId, myId) // ⬅️ 백엔드에 만들어둔 삭제 API 호출!
                                 if (response.isSuccessful) {
                                     Toast.makeText(context, "삭제되었습니다.", Toast.LENGTH_SHORT).show()
-                                    // 방금 지운 사진을 내 폰 화면(리스트)에서도 제거
+                                    // 🗑️ 방금 지운 사진을 내 폰 화면(리스트)에서도 제거
                                     diaryPhotos = diaryPhotos.filter { it.id != deleteId }
                                 } else {
                                     Toast.makeText(context, "삭제 실패: ${response.code()}", Toast.LENGTH_SHORT).show()
@@ -285,7 +304,7 @@ fun FrontSideContent(
                 }
             }
 
-            // 👇 휴지통(삭제) 버튼 (우측 상단)
+            // 휴지통(삭제) 버튼 (우측 상단)
             if (diaryPhotos.isNotEmpty()) {
                 IconButton(
                     // 현재 보고 있는 페이지의 ID를 넘겨줍니다.
@@ -309,13 +328,15 @@ fun FrontSideContent(
             if (pagerState.currentPage > 0) {
                 IconButton(
                     onClick = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
-                    modifier = Modifier.align(Alignment.CenterStart).padding(8.dp).background(White.copy(0.7f), CircleShape)
+                    modifier = Modifier.align(Alignment.CenterStart).padding(8.dp)
+                        .background(White.copy(0.7f), CircleShape)
                 ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, null, tint = DarkGray) }
             }
             if (pagerState.currentPage < diaryPhotos.size - 1) {
                 IconButton(
                     onClick = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
-                    modifier = Modifier.align(Alignment.CenterEnd).padding(8.dp).background(White.copy(0.7f), CircleShape)
+                    modifier = Modifier.align(Alignment.CenterEnd).padding(8.dp)
+                        .background(White.copy(0.7f), CircleShape)
                 ) { Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = DarkGray) }
             }
         }
@@ -335,27 +356,86 @@ fun FrontSideContent(
     }
 }
 
-// BackSideContent 및 날짜 변환 함수는 기존 코드와 동일하게 유지합니다.
+
+
+// 저장 버튼을 눌렀을 때 실행할 행동(onSaveClick)을 전달받도록 변경
 @Composable
-fun BackSideContent(fullDiaryText: String) {
+fun BackSideContent(
+    fullDiaryText: String,
+    onSaveClick: (String) -> Unit
+) {
+    // 수정 모드 상태와 현재 적힌 글씨를 기억하는 변수
+    var isEditing by remember { mutableStateOf(false) }
+    var editedText by remember { mutableStateOf(fullDiaryText) }
+
+    // 서버에서 일기 내용을 새로 불러오면 편집창 글씨도 업데이트
+    LaunchedEffect(fullDiaryText) {
+        editedText = fullDiaryText
+    }
+
     Column(
         modifier = Modifier
             .padding(24.dp)
             .heightIn(min = 350.dp, max = 500.dp)
     ) {
-        Text(
-            text = "오늘의 전체 기록",
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = PrimaryBlue,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
-        Text(
-            text = fullDiaryText,
-            fontSize = 15.sp,
-            color = DarkGray,
-            modifier = Modifier.verticalScroll(rememberScrollState())
-        )
+        // --- 윗부분: 제목과 수정/저장 버튼 ---
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "오늘의 전체 기록",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = PrimaryBlue
+            )
+
+            if (isEditing) {
+                Row {
+                    TextButton(onClick = {
+                        isEditing = false
+                        editedText = fullDiaryText // 취소하면 원래 내용으로 복구
+                    }) {
+                        Text("취소", color = Color.Gray)
+                    }
+                    TextButton(onClick = {
+                        onSaveClick(editedText) // 부모 화면으로 수정된 텍스트 전달!
+                        isEditing = false
+                    }) {
+                        Text("저장", color = PrimaryBlue, fontWeight = FontWeight.Bold)
+                    }
+                }
+            } else {
+                IconButton(onClick = { isEditing = true }, modifier = Modifier.size(24.dp)) {
+                    Icon(Icons.Default.Edit, contentDescription = "수정하기", tint = Color.Gray)
+                }
+            }
+        }
+
+        // --- 아랫부분: 일기 내용 or 텍스트 입력창 ---
+        if (isEditing) {
+            OutlinedTextField(
+                value = editedText,
+                onValueChange = { editedText = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f), // 남은 공간을 꽉 채우도록
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = PrimaryBlue,
+                    unfocusedBorderColor = Color.LightGray
+                )
+            )
+        } else {
+            Text(
+                text = fullDiaryText,
+                fontSize = 15.sp,
+                color = DarkGray,
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            )
+        }
     }
 }
 
