@@ -44,7 +44,7 @@ class User(Base):
 
 
 class Diary(Base):
-    __tablename__ = "diaries"
+    __tablename__ = "one_line_diaries"
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(
