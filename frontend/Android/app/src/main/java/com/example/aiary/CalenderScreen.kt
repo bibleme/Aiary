@@ -36,14 +36,18 @@ fun CalendarScreen(onDateClick: (String) -> Unit) {
     // 현재 보여줄 '연도'와 '월'을 상태로 관리
     var currentYearMonth by remember { mutableStateOf(YearMonth.now()) }
 
-    // [추가 1] 일기가 작성된 날짜(일)들을 저장하는 Set (예: 5일, 12일에 썼다면 setOf(5, 12))
+    // 일기가 작성된 날짜(일)들을 저장하는 Set (예: 5일, 12일에 썼다면 setOf(5, 12))
     var writtenDays by remember { mutableStateOf<Set<Int>>(emptySet()) }
 
-    // [추가 2] 달(currentYearMonth)이 바뀔 때마다 서버에서 일기 목록을 확인합니다.
+    // 달(currentYearMonth)이 바뀔 때마다 서버에서 일기 목록을 확인합니다.
     LaunchedEffect(currentYearMonth) {
         try {
             val myId = UserSession.userId
-            val response = RetrofitClient.api.getDiaries(myId)
+
+            val savedToken = UserSession.accessToken
+            val bearerToken = "Bearer $savedToken"
+
+            val response = RetrofitClient.api.getDiaries(myId, bearerToken)
 
             if (response.isSuccessful) {
                 val allDiaries = response.body() ?: emptyList()
@@ -153,10 +157,10 @@ fun CalendarScreen(onDateClick: (String) -> Unit) {
                     if (writtenDays.contains(day)) {
                         Box(
                             modifier = Modifier
-                                .align(Alignment.TopEnd) 
-                                .padding(8.dp) 
+                                .align(Alignment.TopEnd)
+                                .padding(8.dp)
                                 .size(6.dp) 
-                                .background(Color.Red, CircleShape) // 빨간색 동그라미
+                                .background(Color.Red, CircleShape) 
                         )
                     }
                 }
