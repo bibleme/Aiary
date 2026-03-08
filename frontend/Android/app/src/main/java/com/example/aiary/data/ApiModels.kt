@@ -3,33 +3,33 @@ package com.example.aiary.data
 import javax.annotation.processing.Generated
 import com.google.gson.annotations.SerializedName
 
-// 로그인 요청
+// 1. 로그인 요청
 data class LoginRequest(
     val email: String,
     val password: String
 )
 
-// 로그인 응답 (백엔드 user.py 참고: Token 모델)
+// 2. 로그인 응답 (백엔드 user.py 참고: Token 모델)
 // user_id가 없고 access_token만 옴 -> 나중에 토큰에서 id 추출해야 함
 data class LoginResponse(
     val access_token: String,
     val token_type: String
 )
 
-// 회원가입 요청
+// 3. 회원가입 요청
 data class RegisterRequest(
     val email: String,
     val password: String
 )
 
-// 회원가입 응답
+// 4. 회원가입 응답
 data class UserResponse(
     val id: Int,
     val email: String,
     val created_at: String
 )
 
-// 일기 생성 응답 (백엔드 diary.py: create_diary 반환값 참고)
+// 5. 일기 생성 응답 (백엔드 diary.py: create_diary 반환값 참고)
 // { "status": "success", "diary": { ... } } 형태임
 data class CreateDiaryResponse(
     val status: String,
@@ -52,12 +52,16 @@ data class DaySummaryRequest(
 )
 
 
-data class FullDiaryResponse(
-    val status: String,
-    val full_diary: String?,
-    val bullet_lines: List<String>?,
-    val combined_summary: String?
- )
+
+data class DailyDiaryResponse(
+    val id: Int,
+    val user_id: Int,
+    val diary_date: String,
+    val content: String,
+    val source_count: Int,
+    val created_at: String,
+    val updated_at: String
+)
 
 
 // 비밀번호 변경 요청
@@ -73,7 +77,13 @@ data class DiaryResponse(
     val content: String,
     val image_url: String,
     val created_at: String,
-    
-    @SerializedName("diary_date") 
+
+    @SerializedName("diary_date")
     val diary_date: String? = null
+)
+
+data class DeleteAccountResponse(
+    val message: String,
+    val relogin_required: Boolean,
+    val error_code: String
 )
