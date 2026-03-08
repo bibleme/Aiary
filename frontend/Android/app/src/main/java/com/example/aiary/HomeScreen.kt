@@ -71,7 +71,7 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
         context.getSharedPreferences("aiary_prefs", Context.MODE_PRIVATE)
     }
 
-    // 👇 [핵심 1] 현재 로그인한 사람의 ID를 가져옵니다 (예: 5, 6)
+    // 현재 로그인한 사람의 ID를 가져옵니다 (예: 5, 6)
     val myId = UserSession.userId
 
     // 로그아웃 시 (이제 저장소 초기화 clear() 안 합니다!)
@@ -83,7 +83,7 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
     val items = listOf("홈", "카드형", "리포트", "마이페이지")
     val icons = listOf(Icons.Filled.Home, Icons.Filled.List, Icons.Filled.DateRange, Icons.Filled.Person)
 
-    // 👇 [핵심 2] 불러올 때 "baby_name_5" 처럼 뒤에 myId를 붙여서 내 것만 쏙 빼옵니다!
+    // 불러올 때 "baby_name_5" 처럼 뒤에 myId를 붙여서 내 것만 쏙 빼옵니다!
     var sharedBabyName by remember {
         mutableStateOf(sharedPreferences.getString("baby_name_$myId", "@@") ?: "@@")
     }
@@ -202,21 +202,21 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                     var reportList by remember { mutableStateOf<List<StoryBookData>>(emptyList()) }
                     var selectedReport by remember { mutableStateOf<StoryBookData?>(null) }
 
-                    // [추가] 각 월(Month)별 전체 사진들을 저장해둘 공간 (표지 변경 기능에 쓰임)
+                    // 각 월(Month)별 전체 사진들을 저장해둘 공간 (표지 변경 기능에 쓰임)
                     var monthPhotosMap by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
 
                     LaunchedEffect(Unit) {
                         try {
                             val myId = UserSession.userId
-                            val response = RetrofitClient.api.getDiaries(myId)
+                            val bearerToken = "Bearer ${UserSession.accessToken}"
+                            val response = RetrofitClient.api.getDiaries(myId, bearerToken)
                             if (response.isSuccessful) {
                                 val diaries = response.body() ?: emptyList()
 
                                 if (diaries.isNotEmpty()) {
-                                    // 1. 서버에서 온 일기들을 "YYYY.MM" (예: 2025.12) 단위로 그룹화(묶기) 합니다.
-                                    // 👇 [수정 후]
+                                    // 서버에서 온 일기들을 "YYYY.MM" (예: 2025.12) 단위로 그룹화(묶기) 합니다.
                                     val groupedDiaries = diaries.groupBy { diary ->
-                                        // 👇 date 대신 데이터 클래스에 있는 diary_date를 사용합니다!
+                                        // date 대신 데이터 클래스에 있는 diary_date를 사용합니다!
                                         // 만약 diary_date가 비어있을(null) 경우를 대비해 created_at을 예비용으로 쓰도록 안전장치(?:)도 걸어두었습니다.
                                         val targetDate = diary.diary_date ?: diary.created_at
 
@@ -230,7 +230,7 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                                     val tempReportList = mutableListOf<StoryBookData>()
                                     val tempPhotosMap = mutableMapOf<String, List<String>>()
 
-                                    // 2. 묶여진 월별 일기들을 바탕으로 진짜 책(리포트)을 만듭니다.
+                                    // 묶여진 월별 일기들을 바탕으로 진짜 책(리포트)을 만듭니다.
                                     for ((monthStr, monthDiaries) in groupedDiaries) {
                                         // 해당 월의 모든 사진 주소 정리
                                         val photoUrls = monthDiaries.map { diary ->
@@ -241,11 +241,12 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
 
                                         // 해당 월의 이벤트 추출
                                         val events = monthDiaries.take(3).map { diary ->
-                                            val fixedEventUrl = if (diary.image_url.startsWith("http")) diary.image_url else "http://3.35.185.251:8000${diary.image_url}"
+                                            val fixedEventUrl = if (diary.image_url.startsWith("http"))
+                                                diary.image_url else "http://3.35.185.251:8000${diary.image_url}"
                                             StoryEvent("기록", listOf(fixedEventUrl), diary.content)
                                         }
 
-                                        // 리포트 1권 완성!
+                                        // 리포트 1권 완성
                                         tempReportList.add(
                                             StoryBookData(
                                                 month = monthStr, // "2025.12" 등
@@ -297,7 +298,7 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                             sharedBabyName = newName
                             sharedBabyBirthDate = newDate
 
-                            // 👇 [핵심 3] 저장할 때도 "baby_name_5" 이런 식으로 내 서랍에 저장!
+                            // 저장할 때도 "baby_name_5" 이런 식으로 내 서랍에 저장
                             sharedPreferences.edit()
                                 .putString("baby_name_$myId", newName)
                                 .putString("baby_birth_$myId", newDate)
@@ -306,7 +307,7 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                         onUpdateProfileImage = { newUri ->
                             try {
                                 val inputStream = context.contentResolver.openInputStream(newUri)
-                                // 👇 [핵심 4] 사진 파일 이름도 "baby_profile_5.jpg" 처럼 안 겹치게 만듭니다!
+                                // 사진 파일 이름도 "baby_profile_5.jpg" 처럼 안 겹치게 만듭니다
                                 val file = File(context.filesDir, "baby_profile_$myId.jpg")
                                 val outputStream = FileOutputStream(file)
 
@@ -360,14 +361,14 @@ fun ReportListScreen(
             }
         } else {
             LazyColumn(
-                // 👇 [핵심 1] weight(1f)를 주어 화면 아래 빈 공간을 끝까지 쫙 밀고 내려가게 합니다.
+                // weight(1f)를 주어 화면 아래 빈 공간을 끝까지 쫙 밀고 내려가게 합니다
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
 
-                // 👇 [핵심 2] Alignment.Bottom을 추가해서 책 전체 뭉치를 바닥으로 끌어내립니다!
+                // Alignment.Bottom을 추가해서 책 전체 뭉치를 바닥으로 끌어내립니다
                 verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.Bottom)
             ) {
-                // 👇 [핵심 3] 원래 순서대로(최신이 위로 오게) 그리기 위해 .reversed()는 뺍니다!
+                // 원래 순서대로(최신이 위로 오게) 그리기 위해 .reversed()는 뺍니다
                 itemsIndexed(reports) { index, report ->
                     StackedBookItem(report = report, index = index, onClick = { onReportClick(report) })
                 }
@@ -406,7 +407,7 @@ fun StackedBookItem(
         colors = CardDefaults.cardColors(containerColor = backgroundColor),
         modifier = Modifier
             .fillMaxWidth(widthFraction)
-            // 고정값 대신 위에서 만든 변수를 넣어줍니다!
+            // 고정값 대신 위에서 만든 변수를 넣어줍니다
             .height(currentThickness)
             .clickable { onClick() }
     ) {
