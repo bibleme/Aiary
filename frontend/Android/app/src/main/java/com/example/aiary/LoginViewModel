@@ -1,0 +1,37 @@
+package com.example.aiary
+
+import android.util.Log
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.aiary.data.LoginRequest
+import com.example.aiary.network.RetrofitClient
+import kotlinx.coroutines.launch
+
+// 괄호 안에 있던 복잡한 매개변수(AuthApi)를 뺌
+class LoginViewModel : ViewModel() {
+
+    fun doLogin(emailInput: String, passwordInput: String) {
+        viewModelScope.launch {
+            try {
+                // 서버로 보낼 요청 데이터 뭉치기
+                val request = LoginRequest(email = emailInput, password = passwordInput)
+
+                // RetrofitClient를 이용해서 바로 로그인 API 호출
+                val response = RetrofitClient.api.login(request)
+
+                // 결과 확인
+                if (response.isSuccessful) {
+                    val token = response.body()?.access_token
+                    Log.d("LoginTest", "로그인 성공! 발급받은 토큰: $token")
+
+                    // TODO: 여기서 발급받은 token을 기기에 안전하게 저장해야 함!
+
+                } else {
+                    Log.e("LoginTest", "로그인 실패 (에러코드): ${response.code()}")
+                }
+            } catch (e: Exception) {
+                Log.e("LoginTest", "통신 에러: ${e.message}")
+            }
+        }
+    }
+}
