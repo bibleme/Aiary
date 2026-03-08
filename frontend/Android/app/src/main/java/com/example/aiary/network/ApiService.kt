@@ -4,14 +4,7 @@ import com.example.aiary.data.*
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.Response
-import retrofit2.http.Body
-import retrofit2.http.Multipart
-import retrofit2.http.POST
-import retrofit2.http.Part
-import com.example.aiary.data.ChangePasswordRequest
 import retrofit2.http.*
-import retrofit2.http.DELETE
-import retrofit2.http.Path
 
 interface ApiService {
 
@@ -21,46 +14,62 @@ interface ApiService {
         @Body request: RegisterRequest
     ): Response<UserResponse>
 
-    // 로그인
+    // 로그인 (이게 있으니까 AuthApi가 필요 없어!)
     @POST("users/login")
     suspend fun login(
         @Body request: LoginRequest
     ): Response<LoginResponse>
 
+    // 비밀번호 변경 (PUT 방식으로 하나만 남김)
     @PUT("users/password")
     suspend fun changePassword(
         @Header("Authorization") token: String,
         @Body request: ChangePasswordRequest
     ): Response<Unit>
-    
+
+    // 일기 생성
     @Multipart
-    @POST("diaries/") // 백엔드 주소
+    @POST("diaries/")
     suspend fun createDiary(
+        @Header("Authorization") token: String,
         @Part("user_id") userId: RequestBody,
         @Part("date") date: RequestBody,
         @Part photo: MultipartBody.Part
     ): Response<CreateDiaryResponse>
 
-    // 하루 줄글 일기 생성
-    @POST("diaries/full")
-    suspend fun createFullDiary(
-        @Body request: DaySummaryRequest
-    ): Response<FullDiaryResponse>
+    // 특정 날짜의 하루 일기 조회
+    @GET("daily-diaries/{date_str}")
+    suspend fun getDailyDiary(
+        @Path("date_str") dateStr: String,
+        @Query("user_id") userId: Int,
+        @Header("Authorization") token: String
+    ): Response<DailyDiaryResponse>
 
-    @POST("/users/change-password")
-    suspend fun changePassword(
-        @Body request: ChangePasswordRequest
-    ): Response<Any>
+    // 하루 일기 최초 1회 생성
+    @POST("daily-diaries/")
+    suspend fun createDailyDiary(
+        @Header("Authorization") token: String,
+        @Body request: DaySummaryRequest
+    ): Response<DailyDiaryResponse>
 
     // 유저별 일기 리스트 조회
     @GET("diaries/")
     suspend fun getDiaries(
-        @Query("user_id") userId: Int
+        @Query("user_id") userId: Int,
+        @Header("Authorization") token: String
     ): Response<List<DiaryResponse>>
 
+    // 일기 삭제
     @DELETE("diaries/{diary_id}")
     suspend fun deleteDiary(
         @Path("diary_id") diaryId: Int,
-        @Query("user_id") userId: Int
+        @Query("user_id") userId: Int,
+        @Header("Authorization") token: String,
     ): Response<Unit>
+
+    // 계정 삭제
+    @DELETE("users/me")
+    suspend fun deleteAccount(
+        @Header("Authorization") token: String
+    ): Response<DeleteAccountResponse>
 }
