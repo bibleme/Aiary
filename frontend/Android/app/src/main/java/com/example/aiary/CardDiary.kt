@@ -19,7 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Delete // 👇 [추가] 휴지통 아이콘
+import androidx.compose.material.icons.filled.Delete 
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -42,7 +42,7 @@ import java.time.LocalDate
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.filled.Edit
 
-// 색상 정의 (필요시 PrimaryBlue 등 추가)
+
 private val White = Color(0xFFFFFFFF)
 
 // 삭제를 위해 서버의 고유 ID(id)를 추가로 받습니다.
@@ -74,7 +74,8 @@ fun CardDiaryScreen(
     LaunchedEffect(selectedDate) {
         try {
             val myId = UserSession.userId
-            val listResponse = RetrofitClient.api.getDiaries(myId)
+            val bearerToken = "Bearer ${UserSession.accessToken}"
+            val listResponse = RetrofitClient.api.getDiaries(myId, bearerToken)
 
             if (listResponse.isSuccessful) {
                 val allDiaries = listResponse.body() ?: emptyList()
@@ -103,13 +104,23 @@ fun CardDiaryScreen(
                 }
 
                 if (filteredDiaries.isNotEmpty()) {
-                    val summaryRequest = DaySummaryRequest(myId, targetDate)
-                    val summaryResponse = RetrofitClient.api.createFullDiary(summaryRequest)
+                    // 🟢 먼저 서버에 이미 만들어진 요약 일기가 있는지 '조회(GET)' 해봅니다.
+                    // (주의: ApiService.kt에 getDailyDiary가 선언되어 있어야 합니다!)
+                    val getResponse = RetrofitClient.api.getDailyDiary(targetDate, myId, bearerToken)
 
-                    if (summaryResponse.isSuccessful) {
-                        fullDiaryText = summaryResponse.body()?.full_diary ?: "내용이 없습니다."
+                    if (getResponse.isSuccessful && getResponse.body() != null) {
+                        // 저장된 일기가 있다면? 그걸 그대로 꺼내서 보여줍니다! (일기가 매번 바뀌지 않게 됨)
+                        fullDiaryText = getResponse.body()?.content ?: "내용이 없습니다."
                     } else {
-                        fullDiaryText = "일기 생성 실패: ${summaryResponse.code()}"
+                        // 🔴 조회했는데 없다면? (처음 들어온 상태) -> 이때만 새로 '생성(POST)' 요청을 보냅니다!
+                        val summaryRequest = DaySummaryRequest(myId, targetDate)
+                        val createResponse = RetrofitClient.api.createDailyDiary(bearerToken, summaryRequest)
+
+                        if (createResponse.isSuccessful) {
+                            fullDiaryText = createResponse.body()?.content ?: "내용이 없습니다."
+                        } else {
+                            fullDiaryText = "일기 생성 실패: ${createResponse.code()}"
+                        }
                     }
                 } else {
                     fullDiaryText = "작성된 일기가 없는 날입니다."
@@ -197,7 +208,8 @@ fun CardDiaryScreen(
                                     // 서버에 바뀐 글을 전송합니다 (임시 코드)
                                     coroutineScope.launch {
                                         try {
-                                            // RetrofitClient.api.updateFullDiary(...) 같은 통신 코드
+                                            // RetrofitClient.api.updateFullDiary(...)
+                                            // RetrofitClient.api.
 
                                             Toast.makeText(context, "일기가 수정되었습니다!", Toast.LENGTH_SHORT).show()
                                         } catch (e: Exception) {
@@ -249,10 +261,11 @@ fun CardDiaryScreen(
                         coroutineScope.launch {
                             try {
                                 val myId = UserSession.userId
-                                val response = RetrofitClient.api.deleteDiary(deleteId, myId) // ⬅️ 백엔드에 만들어둔 삭제 API 호출!
+                                val bearerToken = "Bearer ${UserSession.accessToken}"
+                                val response = RetrofitClient.api.deleteDiary(deleteId, myId, bearerToken)// 백엔드에 만들어둔 삭제 API 호출!
                                 if (response.isSuccessful) {
                                     Toast.makeText(context, "삭제되었습니다.", Toast.LENGTH_SHORT).show()
-                                    // 🗑️ 방금 지운 사진을 내 폰 화면(리스트)에서도 제거
+                                    // 방금 지운 사진을 내 폰 화면(리스트)에서도 제거
                                     diaryPhotos = diaryPhotos.filter { it.id != deleteId }
                                 } else {
                                     Toast.makeText(context, "삭제 실패: ${response.code()}", Toast.LENGTH_SHORT).show()
@@ -324,7 +337,7 @@ fun FrontSideContent(
                 }
             }
 
-            // 이전 / 다음 버튼 (기존 코드 유지)
+            // 이전 / 다음 버튼
             if (pagerState.currentPage > 0) {
                 IconButton(
                     onClick = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
@@ -378,7 +391,7 @@ fun BackSideContent(
             .padding(24.dp)
             .heightIn(min = 350.dp, max = 500.dp)
     ) {
-        // --- 윗부분: 제목과 수정/저장 버튼 ---
+        // 윗부분: 제목과 수정/저장 버튼 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -415,7 +428,7 @@ fun BackSideContent(
             }
         }
 
-        // --- 아랫부분: 일기 내용 or 텍스트 입력창 ---
+        // 아랫부분: 일기 내용 or 텍스트 입력창
         if (isEditing) {
             OutlinedTextField(
                 value = editedText,
