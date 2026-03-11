@@ -5,13 +5,13 @@ import android.widget.DatePicker
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.PickVisualMediaRequest // 👇 필수 추가
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow // 👇 필수 추가
-import androidx.compose.foundation.lazy.items // 👇 필수 추가
+import androidx.compose.foundation.lazy.LazyRow 
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -74,9 +74,9 @@ fun ImageUploadScreen(onBack: () -> Unit) {
         calendar.get(Calendar.DAY_OF_MONTH)
     )
 
-    // 10장 다중 선택 전용 런처
+    // 20장 다중 선택 전용 런처
     val galleryLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 10)
+        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 20)
     ) { uriList ->
         if (uriList.isNotEmpty()) {
             selectedImageUris = uriList
@@ -159,7 +159,7 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                 if (selectedImageUris.isEmpty()) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(text = "+", fontSize = 50.sp, color = UploadPrimaryBlue)
-                        Text(text = "사진을 최대 10장까지 선택하세요", color = Color.Gray, fontSize = 14.sp)
+                        Text(text = "사진을 최대 20장까지 선택하세요", color = Color.Gray, fontSize = 14.sp)
                     }
                 } else {
                     LazyRow(
@@ -196,7 +196,7 @@ fun ImageUploadScreen(onBack: () -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = "최대 10장까지 선택 가능합니다.\n아이의 표정이 잘 보이는 사진이 좋아요!",
+                text = "최대 20장까지 선택 가능합니다.\n아이의 표정이 잘 보이는 사진이 좋아요!",
                 color = Color.Gray,
                 fontSize = 12.sp,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
