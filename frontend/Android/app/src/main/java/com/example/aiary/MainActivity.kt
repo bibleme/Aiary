@@ -197,13 +197,13 @@ fun LoginScreen(
                             val accessToken = body?.access_token
 
                             if (accessToken != null) {
-                                // ⭐ JWT 토큰에서 user_id 추출하기
+                                // JWT 토큰에서 user_id 추출하기
                                 val userId = getUserIdFromToken(accessToken)
                                 UserSession.userId = userId
                                 UserSession.userEmail = email  // 입력했던 이메일 저장
                                 UserSession.accessToken = accessToken
 
-                                // 👇 [여기가 추가된 부분입니다!] 핸드폰 창고(SharedPreferences)에 정보 저장하기
+                                // 핸드폰 창고(SharedPreferences)에 정보 저장하기
                                 val sharedPref = context.getSharedPreferences("aiary_prefs", android.content.Context.MODE_PRIVATE)
                                 with(sharedPref.edit()) {
                                     putString("accessToken", accessToken)
