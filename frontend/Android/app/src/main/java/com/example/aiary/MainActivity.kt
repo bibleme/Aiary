@@ -86,7 +86,11 @@ class MainActivity : ComponentActivity() {
                                     // 핸드폰 창고도 싹 비우기!
                                     val sharedPref = context.getSharedPreferences("aiary_prefs",
                                         android.content.Context.MODE_PRIVATE)
-                                    sharedPref.edit().clear().apply()
+                                    sharedPref.edit()
+                                        .remove("accessToken") // 토큰 지우기
+                                        .remove("userId")      // 아이디 지우기
+                                        .remove("userEmail")   // 이메일 지우기
+                                        .apply()
 
                                     currentScreen = 0
                                     Toast.makeText(context, "로그아웃 되었습니다.",
