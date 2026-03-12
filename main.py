@@ -1,7 +1,4 @@
 # app/main.py
-from dotenv import load_dotenv
-load_dotenv()
-
 
 
 from pathlib import Path
@@ -11,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api.endpoints import user, diary  # user, diary 라우터 둘 다 임포트
+from app.config import settings
 
 # 앱 인스턴스 생성
 app = FastAPI(title="Aiary")
@@ -36,15 +34,14 @@ app.add_middleware(
 )
 
 # ---------------- /media 정적 파일 서빙 ----------------
-MEDIA_DIR = Path("media")
-IMAGES_DIR = MEDIA_DIR / "images"
+IMAGES_DIR = Path(settings.IMAGE_UPLOAD_DIR)
+MEDIA_DIR = IMAGES_DIR.parent
 
 
 @app.on_event("startup")
 async def startup_event():
-    MEDIA_DIR.mkdir(exist_ok=True)
-    IMAGES_DIR.mkdir(exist_ok=True)
-
+    MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+    IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 # /media 로 시작하는 URL은 media 폴더에서 파일 서빙
 # 예: http://127.0.0.1:9000/media/images/xxx.jpg

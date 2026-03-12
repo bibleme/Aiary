@@ -10,17 +10,12 @@ import regex as re
 import emoji
 from transformers import BartForConditionalGeneration, PreTrainedTokenizerFast
 
+from app.config import settings
+
+
 # 1) 모델 / 토크나이저 경로 설정
 
-# 이 파일 위치: app/services/daily_diary_generator.py
-# BASE_DIR: 프로젝트 루트 (Aiary/) 를 가리키도록 설정
-BASE_DIR = Path(__file__).resolve().parents[2]
-
-# 모델이 저장된 디렉터리
-#   Aiary/
-#     └─ models/
-#          └─ day_diary_from_summary_v2/
-MODEL_DIR = BASE_DIR / "models" / "day_diary_from_summary_v2"
+MODEL_DIR = Path(settings.DAILY_DIARY_MODEL_DIR)
 
 # 인코딩/디코딩 길이 제한
 MAX_INPUT_LEN = 256
