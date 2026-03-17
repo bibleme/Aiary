@@ -1,29 +1,25 @@
 # app/services/ai_generator.py
 
-import os
 import base64
 from openai import OpenAI
 from fastapi import HTTPException
-from dotenv import load_dotenv
-
-# .env 읽어오기 (OPENAI_API_KEY=... )
-load_dotenv()
+from app.config import settings
 
 MODEL_NAME = "gpt-4.1-mini"
 MAX_TOKENS = 64
 TEMPERATURE = 0.7
 
 
+
 def get_client() -> OpenAI:
     """
-    코랩에서 했던 `client = OpenAI()`를 서버 스타일로 감싼 함수.
-    환경변수에 키가 없으면 500 에러.
+    settings 기반으로 OpenAI 클라이언트를 생성한다.
     """
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = settings.OPENAI_API_KEY
     if not api_key:
         raise HTTPException(
             status_code=500,
-            detail="OPENAI_API_KEY 환경변수가 설정되어 있지 않습니다.",
+            detail="OPENAI_API_KEY 설정이 비어 있습니다.",
         )
     return OpenAI(api_key=api_key)
 
