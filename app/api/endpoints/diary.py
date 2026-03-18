@@ -11,7 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db_session
 from app.db.model import Diary, DailyDiary, User
-from app.schemas.diary import OneLineDiaryResponse, DailyDiaryResponse
+from app.schemas.diary import (
+    OneLineDiaryResponse,
+    DailyDiaryResponse,
+    DailyDiaryUpdateRequest,
+)
 from app.services.ai_generator import generate_one_line_diary
 from app.services.daily_diary_generator import generate_daily_diary
 from app.services.security import get_current_user
@@ -26,10 +30,9 @@ GPT_USER_PROMPT = (
     "문장에 이모지를 적극적으로 활용하세요."
 )
 
-
-# 업로드 이미지 저장 폴더 (.env 기반)
 IMAGES_DIR = Path(settings.IMAGE_UPLOAD_DIR)
 IMAGES_DIR.mkdir(parents=True, exist_ok=True)
+
 
 class DaySummaryRequest(BaseModel):
     date: str  # YYYY-MM-DD
@@ -113,7 +116,6 @@ async def create_diary(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        # 날짜를 따로 안 보내면 오늘 날짜 사용
         diary_date = _parse_date(date_str) if date_str else date.today()
 
         image_bytes = await photo.read()
@@ -123,10 +125,8 @@ async def create_diary(
                 detail="빈 이미지 파일입니다.",
             )
 
-        # 한줄일기 생성
         one_line = await generate_one_line_diary(image_bytes, GPT_USER_PROMPT)
 
-        # 이미지 저장
         filename = _generate_filename(photo.filename or "image.jpg")
         file_path = IMAGES_DIR / filename
         with open(file_path, "wb") as f:
@@ -134,7 +134,6 @@ async def create_diary(
 
         image_url = f"/media/images/{filename}"
 
-        # 생성 결과를 DB에 저장
         new_diary = Diary(
             user_id=current_user.id,
             content=one_line,
@@ -166,7 +165,6 @@ async def list_diaries(
     try:
         stmt = select(Diary).where(Diary.user_id == current_user.id)
 
-        # 날짜 필터가 있으면 해당 날짜만 조회
         if date_str:
             target_date = _parse_date(date_str)
             stmt = stmt.where(Diary.diary_date == target_date)
@@ -210,137 +208,6 @@ async def get_one_line_diary(
     return _serialize_diary(diary)
 
 
-@router.post("/daily-diaries/", response_model=DailyDiaryResponse)
-async def create_daily_diary(
-    payload: DaySummaryRequest,
-    db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
-):
-    try:
-        target_date = _parse_date(payload.date)
-
-        # 이미 있으면 새로 만들지 않고 기존 저장값 반환
-        existing = await _get_daily_diary(db, current_user.id, target_date)
-        if existing:
-            return _serialize_daily_diary(existing)
-
-        diaries = await _get_one_line_diaries_for_date(db, current_user.id, target_date)
-        if not diaries:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="해당 날짜에 한줄일기가 없습니다.",
-            )
-
-        one_lines = [diary.content for diary in diaries]
-
-        # 하루일기 생성
-        gen_result = await generate_daily_diary(one_lines)
-        full_diary = gen_result["generated_diary"]
-
-        # 최초 생성 결과를 저장
-        new_daily_diary = DailyDiary(
-            user_id=current_user.id,
-            diary_date=target_date,
-            content=full_diary,
-            source_count=len(one_lines),
-        )
-
-        db.add(new_daily_diary)
-        await db.commit()
-        await db.refresh(new_daily_diary)
-
-        return _serialize_daily_diary(new_daily_diary)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Daily diary create failed: {e}",
-        )
-
-
-@router.get("/daily-diaries/{date_str}", response_model=DailyDiaryResponse)
-async def get_daily_diary(
-    date_str: str,
-    db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
-):
-    try:
-        target_date = _parse_date(date_str)
-
-        # 조회는 저장값만 반환
-        existing = await _get_daily_diary(db, current_user.id, target_date)
-        if not existing:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="해당 날짜의 하루일기가 아직 생성되지 않았습니다.",
-            )
-
-        return _serialize_daily_diary(existing)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Daily diary get failed: {e}",
-        )
-
-
-@router.put("/daily-diaries/{date_str}/regenerate", response_model=DailyDiaryResponse)
-async def regenerate_daily_diary(
-    date_str: str,
-    db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
-):
-    try:
-        target_date = _parse_date(date_str)
-
-        diaries = await _get_one_line_diaries_for_date(db, current_user.id, target_date)
-        if not diaries:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="해당 날짜에 한줄일기가 없습니다.",
-            )
-
-        one_lines = [diary.content for diary in diaries]
-
-        # 명시적으로 다시 생성
-        gen_result = await generate_daily_diary(one_lines)
-        full_diary = gen_result["generated_diary"]
-
-        existing = await _get_daily_diary(db, current_user.id, target_date)
-
-        if existing:
-            existing.content = full_diary
-            existing.source_count = len(one_lines)
-            await db.commit()
-            await db.refresh(existing)
-            return _serialize_daily_diary(existing)
-
-        # 기존 데이터가 없으면 새로 생성
-        new_daily_diary = DailyDiary(
-            user_id=current_user.id,
-            diary_date=target_date,
-            content=full_diary,
-            source_count=len(one_lines),
-        )
-        db.add(new_daily_diary)
-        await db.commit()
-        await db.refresh(new_daily_diary)
-
-        return _serialize_daily_diary(new_daily_diary)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Daily diary regenerate failed: {e}",
-        )
-
-
 @router.delete("/diaries/{diary_id}")
 async def delete_diary(
     diary_id: int,
@@ -377,4 +244,169 @@ async def delete_diary(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Diary delete failed: {e}",
+        )
+
+
+@router.post("/daily-diaries/", response_model=DailyDiaryResponse)
+async def create_daily_diary(
+    payload: DaySummaryRequest,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        target_date = _parse_date(payload.date)
+
+        existing = await _get_daily_diary(db, current_user.id, target_date)
+        if existing:
+            return _serialize_daily_diary(existing)
+
+        diaries = await _get_one_line_diaries_for_date(db, current_user.id, target_date)
+        if not diaries:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="해당 날짜에 한줄일기가 없습니다.",
+            )
+
+        one_lines = [diary.content for diary in diaries]
+
+        gen_result = await generate_daily_diary(one_lines)
+        full_diary = gen_result["generated_diary"]
+
+        new_daily_diary = DailyDiary(
+            user_id=current_user.id,
+            diary_date=target_date,
+            content=full_diary,
+            source_count=len(one_lines),
+        )
+
+        db.add(new_daily_diary)
+        await db.commit()
+        await db.refresh(new_daily_diary)
+
+        return _serialize_daily_diary(new_daily_diary)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Daily diary create failed: {e}",
+        )
+
+
+@router.get("/daily-diaries/{date_str}", response_model=DailyDiaryResponse)
+async def get_daily_diary(
+    date_str: str,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        target_date = _parse_date(date_str)
+
+        existing = await _get_daily_diary(db, current_user.id, target_date)
+        if not existing:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="해당 날짜의 하루일기가 아직 생성되지 않았습니다.",
+            )
+
+        return _serialize_daily_diary(existing)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Daily diary get failed: {e}",
+        )
+
+
+@router.patch("/daily-diaries/{date_str}", response_model=DailyDiaryResponse)
+async def update_daily_diary(
+    date_str: str,
+    payload: DailyDiaryUpdateRequest,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        target_date = _parse_date(date_str)
+
+        content = payload.content.strip()
+        if not content:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="content는 비어 있을 수 없습니다.",
+            )
+
+        existing = await _get_daily_diary(db, current_user.id, target_date)
+        if not existing:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="해당 날짜의 하루일기가 존재하지 않습니다.",
+            )
+
+        existing.content = content
+
+        await db.commit()
+        await db.refresh(existing)
+
+        return _serialize_daily_diary(existing)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Daily diary update failed: {e}",
+        )
+
+
+@router.put("/daily-diaries/{date_str}/regenerate", response_model=DailyDiaryResponse)
+async def regenerate_daily_diary(
+    date_str: str,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        target_date = _parse_date(date_str)
+
+        diaries = await _get_one_line_diaries_for_date(db, current_user.id, target_date)
+        if not diaries:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="해당 날짜에 한줄일기가 없습니다.",
+            )
+
+        one_lines = [diary.content for diary in diaries]
+
+        gen_result = await generate_daily_diary(one_lines)
+        full_diary = gen_result["generated_diary"]
+
+        existing = await _get_daily_diary(db, current_user.id, target_date)
+
+        if existing:
+            existing.content = full_diary
+            existing.source_count = len(one_lines)
+            await db.commit()
+            await db.refresh(existing)
+            return _serialize_daily_diary(existing)
+
+        new_daily_diary = DailyDiary(
+            user_id=current_user.id,
+            diary_date=target_date,
+            content=full_diary,
+            source_count=len(one_lines),
+        )
+        db.add(new_daily_diary)
+        await db.commit()
+        await db.refresh(new_daily_diary)
+
+        return _serialize_daily_diary(new_daily_diary)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Daily diary regenerate failed: {e}",
         )
