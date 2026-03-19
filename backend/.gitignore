@@ -27,14 +27,6 @@ __pycache__/
 # -------------------- Private -------------------
 Aiary.pem
 
-
-# ==== ML model weights (too large for GitHub) ====
-models/day_diary_from_summary_v2/
-*.safetensors
-*.pt
-*.bin
-*.ckpt
-
 #------------------------------------
 .env
 venv/

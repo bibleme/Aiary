@@ -4,12 +4,14 @@ from pathlib import Path
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
+# 🌟 1. BackgroundTasks 추가
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.database import get_db_session
+# 🌟 2. DB 세션과 비전 분석기 불러오기 추가
+from app.db.database import get_db_session, AsyncSessionLocal
 from app.db.model import Diary, DailyDiary, User
 from app.schemas.diary import (
     OneLineDiaryResponse,
@@ -17,9 +19,11 @@ from app.schemas.diary import (
     DailyDiaryUpdateRequest,
 )
 from app.services.ai_generator import generate_one_line_diary
-from app.services.daily_diary_generator import generate_daily_diary
+from app.services.daily_diary_generator_v3_eval import generate_daily_diary_v3_eval
 from app.services.security import get_current_user
 from app.config import settings
+
+from app.services.vision_analyzer import process_vision_analysis
 
 router = APIRouter(tags=["diaries"])
 
@@ -34,9 +38,9 @@ IMAGES_DIR = Path(settings.IMAGE_UPLOAD_DIR)
 IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 
+# --- [기존 Helper 함수들 그대로 유지] ---
 class DaySummaryRequest(BaseModel):
     date: str  # YYYY-MM-DD
-
 
 def _parse_date(date_str: str) -> date:
     try:
@@ -47,13 +51,11 @@ def _parse_date(date_str: str) -> date:
             detail="date는 YYYY-MM-DD 형식이어야 합니다.",
         )
 
-
 def _generate_filename(original_name: str) -> str:
     ext = Path(original_name).suffix or ".jpg"
     ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     uid = uuid4().hex[:8]
     return f"{ts}_{uid}{ext}"
-
 
 def _serialize_diary(diary: Diary) -> dict:
     return {
@@ -64,7 +66,6 @@ def _serialize_diary(diary: Diary) -> dict:
         "diary_date": diary.diary_date,
         "created_at": diary.created_at,
     }
-
 
 def _serialize_daily_diary(daily_diary: DailyDiary) -> dict:
     return {
@@ -77,39 +78,36 @@ def _serialize_daily_diary(daily_diary: DailyDiary) -> dict:
         "updated_at": daily_diary.updated_at,
     }
 
-
-async def _get_one_line_diaries_for_date(
-    db: AsyncSession,
-    user_id: int,
-    target_date: date,
-) -> list[Diary]:
+async def _get_one_line_diaries_for_date(db: AsyncSession, user_id: int, target_date: date) -> list[Diary]:
     result = await db.execute(
         select(Diary)
-        .where(
-            Diary.user_id == user_id,
-            Diary.diary_date == target_date,
-        )
+        .where(Diary.user_id == user_id, Diary.diary_date == target_date)
         .order_by(Diary.created_at.asc(), Diary.id.asc())
     )
     return list(result.scalars().all())
 
-
-async def _get_daily_diary(
-    db: AsyncSession,
-    user_id: int,
-    target_date: date,
-) -> Optional[DailyDiary]:
+async def _get_daily_diary(db: AsyncSession, user_id: int, target_date: date) -> Optional[DailyDiary]:
     result = await db.execute(
-        select(DailyDiary).where(
-            DailyDiary.user_id == user_id,
-            DailyDiary.diary_date == target_date,
-        )
+        select(DailyDiary).where(DailyDiary.user_id == user_id, DailyDiary.diary_date == target_date)
     )
     return result.scalar_one_or_none()
 
 
+# 🌟 3. [추가됨] 백그라운드 비전 분석 실행 함수
+async def run_vision_analysis_background(diary_id: int, image_path: str):
+    async with AsyncSessionLocal() as session:
+        try:
+            print(f"🚀 [Background] 일기 ID {diary_id} 비전 분석 시작...")
+            await process_vision_analysis(diary_id, image_path, session)
+            print(f"✅ [Background] 일기 ID {diary_id} 비전 분석 성공!")
+        except Exception as e:
+            print(f"❌ [Background] 비전 분석 중 에러 발생: {e}")
+
+
+# 🌟 4. [수정됨] 사진 업로드 API (백그라운드 도구 주입)
 @router.post("/diaries/", response_model=OneLineDiaryResponse)
 async def create_diary(
+    background_tasks: BackgroundTasks, # <- 백그라운드 도구 추가!
     photo: UploadFile = File(...),
     date_str: Optional[str] = Form(None),
     db: AsyncSession = Depends(get_db_session),
@@ -120,40 +118,43 @@ async def create_diary(
 
         image_bytes = await photo.read()
         if not image_bytes:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="빈 이미지 파일입니다.",
-            )
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="빈 이미지 파일입니다.")
 
+        # 1. GPT로 한 줄 일기 텍스트 생성
         one_line = await generate_one_line_diary(image_bytes, GPT_USER_PROMPT)
 
+        # 2. 이미지 물리적 저장
         filename = _generate_filename(photo.filename or "image.jpg")
         file_path = IMAGES_DIR / filename
         with open(file_path, "wb") as f:
             f.write(image_bytes)
-
         image_url = f"/media/images/{filename}"
 
+        # 3. DB에 일기 정보 저장
         new_diary = Diary(
             user_id=current_user.id,
             content=one_line,
             image_url=image_url,
             diary_date=diary_date,
         )
-
         db.add(new_diary)
         await db.commit()
         await db.refresh(new_diary)
+
+        # 🌟 4. [추가됨] 비전 AI 분석을 백그라운드로 던지기!
+        # 프론트엔드는 안 기다려도 됩니다. 서버 뒷단에서 알아서 돌아갑니다.
+        background_tasks.add_task(
+            run_vision_analysis_background,
+            diary_id=new_diary.id,
+            image_path=str(file_path) # 저장된 물리적 경로를 넘겨줌
+        )
 
         return _serialize_diary(new_diary)
 
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Diary creation failed: {e}",
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Diary creation failed: {e}")
 
 
 @router.get("/diaries/", response_model=list[OneLineDiaryResponse])
