@@ -35,26 +35,22 @@ models/day_diary_from_summary_v2/
 *.bin
 *.ckpt
 
+#------------------------------------
+.env
+venv/
+__pycache__/
+*.pyc
 
-# ---------- Android / Frontend ----------
-frontend/Android/.idea/
-*.iml
-.gradle/
-local.properties
-captures/
-build/
-app/build/
+new_aiary_key
+new_aiary_key.pub
 
-# ---------- Backend uploads (이미지 등 테스트 파일) ----------
-backend/media/images/
+nohup.out
+uvicorn.log
+server.log
 
-# ---------- Keys / Private files ----------
-backend/new_aiary_key
-backend/new_aiary_key.pub
-Aiary.pem
-# Keys / private files
-backend/new_aiary_key
-backend/new_aiary_key.pub
-*aiary_key*
-*.pem
-*.pub
+*.bak_*
+*.bak
+main.py.bak_*
+
+media/images/
+one_lines
