@@ -48,7 +48,7 @@ def generate_monthly_report(db_path: str) -> dict:
         
         if not df_obj.empty:
             df_obj_unique = df_obj.drop_duplicates(subset=['instance_id', 'file_name'])
-            top_instances = df_obj_unique['instance_id'].value_counts().head(3).index.tolist()
+            top_instances = df_obj_unique['instance_id'].value_counts().head(1).index.tolist()
             
             for rank, inst_id in enumerate(top_instances, start=1):
                 inst_data = df_obj_unique[df_obj_unique['instance_id'] == inst_id]
