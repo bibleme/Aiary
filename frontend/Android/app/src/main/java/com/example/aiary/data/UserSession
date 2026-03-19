@@ -1,7 +1,0 @@
-package com.example.aiary.data
-
-object UserSession {
-    var userId: Int = 0
-    var userEmail: String = ""
-    var accessToken: String = ""
-}
