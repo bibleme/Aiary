@@ -272,6 +272,13 @@ async def create_daily_diary(
         gen_result = await generate_daily_diary(one_lines)
         full_diary = gen_result["generated_diary"]
 
+        print(
+            f"[daily-diary] user_id={current_user.id} "
+            f"date={target_date} "
+            f"model_version={gen_result.get('model_version', 'unknown')} "
+            f"one_lines_count={len(one_lines)}",
+            flush=True,
+        )
         new_daily_diary = DailyDiary(
             user_id=current_user.id,
             diary_date=target_date,
@@ -381,6 +388,14 @@ async def regenerate_daily_diary(
 
         gen_result = await generate_daily_diary(one_lines)
         full_diary = gen_result["generated_diary"]
+
+        print(
+            f"[daily-diary-regenerate] user_id={current_user.id} "
+            f"date={target_date} "
+            f"model_version={gen_result.get('model_version', 'unknown')} "
+            f"one_lines_count={len(one_lines)}",
+            flush=True,
+        )
 
         existing = await _get_daily_diary(db, current_user.id, target_date)
 
