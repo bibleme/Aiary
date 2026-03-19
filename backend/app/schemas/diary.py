@@ -21,6 +21,10 @@ class DailyDiaryCreateRequest(BaseModel):
     date: str = Field(..., description="YYYY-MM-DD")
 
 
+class DailyDiaryUpdateRequest(BaseModel):
+    content: str = Field(..., min_length=1, description="수정할 하루일기 내용")
+
+
 class DailyDiaryResponse(BaseModel):
     id: int
     user_id: int

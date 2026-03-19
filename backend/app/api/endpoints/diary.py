@@ -11,10 +11,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db_session
 from app.db.model import Diary, DailyDiary, User
-from app.schemas.diary import OneLineDiaryResponse, DailyDiaryResponse
+from app.schemas.diary import (
+    OneLineDiaryResponse,
+    DailyDiaryResponse,
+    DailyDiaryUpdateRequest,
+)
 from app.services.ai_generator import generate_one_line_diary
 from app.services.daily_diary_generator import generate_daily_diary
 from app.services.security import get_current_user
+from app.config import settings
 
 router = APIRouter(tags=["diaries"])
 
@@ -25,11 +30,8 @@ GPT_USER_PROMPT = (
     "문장에 이모지를 적극적으로 활용하세요."
 )
 
-# 업로드 이미지 저장 폴더
-MEDIA_DIR = Path("media")
-IMAGES_DIR = MEDIA_DIR / "images"
-MEDIA_DIR.mkdir(exist_ok=True)
-IMAGES_DIR.mkdir(exist_ok=True)
+IMAGES_DIR = Path(settings.IMAGE_UPLOAD_DIR)
+IMAGES_DIR.mkdir(parents=True, exist_ok=True)
 
 
 class DaySummaryRequest(BaseModel):
@@ -106,9 +108,6 @@ async def _get_daily_diary(
     return result.scalar_one_or_none()
 
 
-# -------------------------------------------------------------------
-# 1) 한 줄 일기 관련 API
-# -------------------------------------------------------------------
 @router.post("/diaries/", response_model=OneLineDiaryResponse)
 async def create_diary(
     photo: UploadFile = File(...),
@@ -117,7 +116,6 @@ async def create_diary(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        # 날짜를 따로 안 보내면 오늘 날짜 사용
         diary_date = _parse_date(date_str) if date_str else date.today()
 
         image_bytes = await photo.read()
@@ -127,10 +125,8 @@ async def create_diary(
                 detail="빈 이미지 파일입니다.",
             )
 
-        # 한줄일기 생성
         one_line = await generate_one_line_diary(image_bytes, GPT_USER_PROMPT)
 
-        # 이미지 저장
         filename = _generate_filename(photo.filename or "image.jpg")
         file_path = IMAGES_DIR / filename
         with open(file_path, "wb") as f:
@@ -138,7 +134,6 @@ async def create_diary(
 
         image_url = f"/media/images/{filename}"
 
-        # 생성 결과를 DB에 저장
         new_diary = Diary(
             user_id=current_user.id,
             content=one_line,
@@ -170,7 +165,6 @@ async def list_diaries(
     try:
         stmt = select(Diary).where(Diary.user_id == current_user.id)
 
-        # 날짜 필터가 있으면 해당 날짜만 조회
         if date_str:
             target_date = _parse_date(date_str)
             stmt = stmt.where(Diary.diary_date == target_date)
@@ -253,9 +247,6 @@ async def delete_diary(
         )
 
 
-# -------------------------------------------------------------------
-# 2) AI 하루 일기(Daily Diary) 관련 API
-# -------------------------------------------------------------------
 @router.post("/daily-diaries/", response_model=DailyDiaryResponse)
 async def create_daily_diary(
     payload: DaySummaryRequest,
@@ -265,7 +256,6 @@ async def create_daily_diary(
     try:
         target_date = _parse_date(payload.date)
 
-        # 이미 있으면 새로 만들지 않고 기존 저장값 반환
         existing = await _get_daily_diary(db, current_user.id, target_date)
         if existing:
             return _serialize_daily_diary(existing)
@@ -279,13 +269,16 @@ async def create_daily_diary(
 
         one_lines = [diary.content for diary in diaries]
 
-        # 하루일기 생성 (AI 연산 호출)
         gen_result = await generate_daily_diary(one_lines)
-        
-        # ✅ 방금 우리가 수정한 AI 함수의 반환 키("content") 적용!
-        full_diary = gen_result["content"]
+        full_diary = gen_result["generated_diary"]
 
-        # 최초 생성 결과를 DB에 저장
+        print(
+            f"[daily-diary] user_id={current_user.id} "
+            f"date={target_date} "
+            f"model_version={gen_result.get('model_version', 'unknown')} "
+            f"one_lines_count={len(one_lines)}",
+            flush=True,
+        )
         new_daily_diary = DailyDiary(
             user_id=current_user.id,
             diary_date=target_date,
@@ -317,7 +310,6 @@ async def get_daily_diary(
     try:
         target_date = _parse_date(date_str)
 
-        # 조회는 저장값만 반환
         existing = await _get_daily_diary(db, current_user.id, target_date)
         if not existing:
             raise HTTPException(
@@ -333,6 +325,46 @@ async def get_daily_diary(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Daily diary get failed: {e}",
+        )
+
+
+@router.patch("/daily-diaries/{date_str}", response_model=DailyDiaryResponse)
+async def update_daily_diary(
+    date_str: str,
+    payload: DailyDiaryUpdateRequest,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        target_date = _parse_date(date_str)
+
+        content = payload.content.strip()
+        if not content:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="content는 비어 있을 수 없습니다.",
+            )
+
+        existing = await _get_daily_diary(db, current_user.id, target_date)
+        if not existing:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="해당 날짜의 하루일기가 존재하지 않습니다.",
+            )
+
+        existing.content = content
+
+        await db.commit()
+        await db.refresh(existing)
+
+        return _serialize_daily_diary(existing)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Daily diary update failed: {e}",
         )
 
 
@@ -354,11 +386,16 @@ async def regenerate_daily_diary(
 
         one_lines = [diary.content for diary in diaries]
 
-        # 명시적으로 다시 생성 (AI 연산 재호출)
         gen_result = await generate_daily_diary(one_lines)
-        
-        # ✅ 여기도 "content" 키로 맞춰서 값을 빼옵니다!
-        full_diary = gen_result["content"]
+        full_diary = gen_result["generated_diary"]
+
+        print(
+            f"[daily-diary-regenerate] user_id={current_user.id} "
+            f"date={target_date} "
+            f"model_version={gen_result.get('model_version', 'unknown')} "
+            f"one_lines_count={len(one_lines)}",
+            flush=True,
+        )
 
         existing = await _get_daily_diary(db, current_user.id, target_date)
 
@@ -369,7 +406,6 @@ async def regenerate_daily_diary(
             await db.refresh(existing)
             return _serialize_daily_diary(existing)
 
-        # 혹시 기존 데이터가 없으면 새로 생성해서 저장
         new_daily_diary = DailyDiary(
             user_id=current_user.id,
             diary_date=target_date,
