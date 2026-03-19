@@ -1,0 +1,17 @@
+# --- PyTorch (OS 및 CUDA 버전에 맞게 설치 필요) ---
+torch>=2.0.0
+torchvision
+
+# --- Vision AI Models ---
+ultralytics==8.1.0        # YOLO
+deepface==0.0.86          # 인물 식별 (VGG-Face)
+transformers>=4.37.0      # SigLIP (Hugging Face)
+git+https://github.com/openai/CLIP.git  # CLIP
+
+# --- Image Processing & Utils ---
+opencv-python-headless    # cv2 (서버 환경용 headless 권장)
+Pillow                    # PIL
+pandas
+
+# --- Database ---
+SQLAlchemy>=2.0.0
