@@ -1,5 +1,6 @@
 import re
 import gc
+import asyncio
 import torch
 
 from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
@@ -11,6 +12,7 @@ from app.config import settings
 _tokenizer = None
 _model = None
 _device = None
+_model_load_lock = asyncio.Lock()
 
 # ----------------------------
 # device
@@ -195,6 +197,7 @@ def load_model():
     ).to(_device)
 
     _model.eval()
+    print("[v3_eval] model loaded successfully on device:", _device)
     return _tokenizer, _model, _device
 
 # ----------------------------
@@ -234,7 +237,14 @@ def generate_diary(model, tok, one_lines, device, max_input_length=512):
 # 서버/평가용 엔트리
 # ----------------------------
 async def generate_daily_diary_v3_eval(one_line_diaries: list[str]) -> dict:
-    tok, model, device = load_model()
+    global _model, _tokenizer, _device
+
+    if _model is None:
+        async with _model_load_lock:
+            if _model is None:
+                load_model()
+
+    tok, model, device = _tokenizer, _model, _device
     generated_diary = generate_diary(model, tok, one_line_diaries, device)
 
     return {
