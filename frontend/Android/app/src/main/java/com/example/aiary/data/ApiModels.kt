@@ -63,6 +63,11 @@ data class DailyDiaryResponse(
     val updated_at: String
 )
 
+// 하루 일기 수정 요청
+data class UpdateDiaryContentRequest(
+    val content: String
+)
+
 
 // 비밀번호 변경 요청
 data class ChangePasswordRequest(
