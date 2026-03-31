@@ -85,6 +85,7 @@ async def get_monthly_diaries(
         days_map[daily.diary_date].daily_diary = DailyDiaryItem(
             id=daily.id,
             diary_date=daily.diary_date,
+            content=final_content,  # 하위호환용
             generated_content=generated_content,
             edited_content=daily.edited_content,
             final_content=final_content,
