@@ -100,6 +100,6 @@ class DailyDiary(Base):
         onupdate=datetime.datetime.utcnow,
         nullable=False,
     )
-    edited_at = Column(DateTime, nullable=True)
-
+    edited_at = Column(DateTime(timezone=True), nullable=True)
+    
     owner = relationship("User", back_populates="daily_diaries")
