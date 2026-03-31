@@ -33,7 +33,7 @@ interface ApiService {
     suspend fun createDiary(
         @Header("Authorization") token: String,
         @Part("user_id") userId: RequestBody,
-        @Part("date") date: RequestBody,
+        @Part("date_str") date: RequestBody,
         @Part photo: MultipartBody.Part
     ): Response<CreateDiaryResponse>
 
@@ -58,6 +58,22 @@ interface ApiService {
         @Query("user_id") userId: Int,
         @Header("Authorization") token: String
     ): Response<List<DiaryResponse>>
+
+    // 하루 일기 수정 API
+    @PATCH("daily-diaries/{date_str}")
+    suspend fun updateDailyDiary(
+        @Path("date_str") dateStr: String,
+        @Header("Authorization") token: String,
+        @Body request: UpdateDiaryContentRequest
+    ): Response<DailyDiaryResponse>
+
+    // 하루 일기 재생성 API (PUT 방식)
+    @PUT("daily-diaries/{date_str}/regenerate")
+    suspend fun regenerateDailyDiary(
+        @Path("date_str") dateStr: String,
+        @Header("Authorization") token: String
+    ): Response<DailyDiaryResponse>
+
 
     // 일기 삭제
     @DELETE("diaries/{diary_id}")
