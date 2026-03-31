@@ -2,11 +2,8 @@ package com.example.aiary
 
 import android.content.Context
 import android.net.Uri
-import android.os.Build
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,16 +40,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.clickable
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -71,10 +62,7 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
         context.getSharedPreferences("aiary_prefs", Context.MODE_PRIVATE)
     }
 
-    // 현재 로그인한 사람의 ID를 가져옵니다 (예: 5, 6)
     val myId = UserSession.userId
-
-    // 로그아웃 시 (이제 저장소 초기화 clear() 안 합니다!)
     val handleLogout = {
         onLogout()
     }
@@ -82,8 +70,6 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
     var selectedItem by remember { mutableIntStateOf(0) }
     val items = listOf("홈", "카드형", "리포트", "마이페이지")
     val icons = listOf(Icons.Filled.Home, Icons.Filled.List, Icons.Filled.DateRange, Icons.Filled.Person)
-
-    // 불러올 때 "baby_name_5" 처럼 뒤에 myId를 붙여서 내 것만 쏙 빼옵니다!
     var sharedBabyName by remember {
         mutableStateOf(sharedPreferences.getString("baby_name_$myId", "@@") ?: "@@")
     }
@@ -144,7 +130,8 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                             modifier = Modifier.padding(bottom = 8.dp))
                         Text(text = "$sharedBabyName 와 만난 지", fontSize = 20.sp, color = DarkGray)
                         Spacer(modifier = Modifier.height(7.dp))
-                        Text(text = dDayString, fontSize = 55.sp, fontWeight = FontWeight.Bold, color = PrimaryBlue,
+                        Text(text = dDayString, fontSize = 55.sp, fontWeight = FontWeight.Bold,
+                            color = PrimaryBlue,
                             modifier = Modifier.padding(bottom = 40.dp))
 
                         // 중앙 사진
@@ -154,8 +141,7 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                                 .size(220.dp)
                                 .shadow(10.dp, CircleShape)
                                 .clip(CircleShape)
-                            //    .background(White)
-                            //    .border(6.dp, White, CircleShape)
+
                         ) {
                             if (sharedProfileUri != null) {
                                 AsyncImage(
@@ -216,7 +202,7 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                                 if (diaries.isNotEmpty()) {
                                     // 서버에서 온 일기들을 "YYYY.MM" (예: 2025.12) 단위로 그룹화(묶기) 합니다.
                                     val groupedDiaries = diaries.groupBy { diary ->
-                                        // date 대신 데이터 클래스에 있는 diary_date를 사용합니다!
+                                        // date 대신 데이터 클래스에 있는 diary_date를 사용
                                         // 만약 diary_date가 비어있을(null) 경우를 대비해 created_at을 예비용으로 쓰도록 안전장치(?:)도 걸어두었습니다.
                                         val targetDate = diary.diary_date ?: diary.created_at
 
@@ -230,7 +216,7 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                                     val tempReportList = mutableListOf<StoryBookData>()
                                     val tempPhotosMap = mutableMapOf<String, List<String>>()
 
-                                    // 묶여진 월별 일기들을 바탕으로 진짜 책(리포트)을 만듭니다.
+                                    // 2. 묶여진 월별 일기들을 바탕으로 진짜 책(리포트)을 만듭니다.
                                     for ((monthStr, monthDiaries) in groupedDiaries) {
                                         // 해당 월의 모든 사진 주소 정리
                                         val photoUrls = monthDiaries.map { diary ->
@@ -276,14 +262,7 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                             storyData = selectedReport!!,
                             // 내가 선택한 달(month)의 사진들만 팝업에 넘겨줌!
                             allMonthPhotoUrls = monthPhotosMap[selectedReport!!.month] ?: emptyList(),
-                            onBack = { selectedReport = null },
-                            onMainPhotoChanged = { newUrl ->
-                                selectedReport = selectedReport!!.copy(mainPhotoUrl = newUrl)
-                                reportList = reportList.map { report ->
-                                    if (report.month == selectedReport!!.month) report.copy(mainPhotoUrl = newUrl)
-                                    else report
-                                }
-                            }
+                            onBack = { selectedReport = null }
                         )
                     }
                 }
@@ -298,7 +277,6 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                             sharedBabyName = newName
                             sharedBabyBirthDate = newDate
 
-                            // 저장할 때도 "baby_name_5" 이런 식으로 내 서랍에 저장
                             sharedPreferences.edit()
                                 .putString("baby_name_$myId", newName)
                                 .putString("baby_birth_$myId", newDate)
@@ -307,7 +285,6 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                         onUpdateProfileImage = { newUri ->
                             try {
                                 val inputStream = context.contentResolver.openInputStream(newUri)
-                                // 사진 파일 이름도 "baby_profile_5.jpg" 처럼 안 겹치게 만듭니다
                                 val file = File(context.filesDir, "baby_profile_$myId.jpg")
                                 val outputStream = FileOutputStream(file)
 
@@ -361,14 +338,10 @@ fun ReportListScreen(
             }
         } else {
             LazyColumn(
-                // weight(1f)를 주어 화면 아래 빈 공간을 끝까지 쫙 밀고 내려가게 합니다
                 modifier = Modifier.weight(1f).fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
-
-                // Alignment.Bottom을 추가해서 책 전체 뭉치를 바닥으로 끌어내립니다
                 verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.Bottom)
             ) {
-                // 원래 순서대로(최신이 위로 오게) 그리기 위해 .reversed()는 뺍니다
                 itemsIndexed(reports) { index, report ->
                     StackedBookItem(report = report, index = index, onClick = { onReportClick(report) })
                 }
@@ -385,11 +358,11 @@ fun StackedBookItem(
 ) {
     // 책등 색상 팔레트
     val bookColors = listOf(
-        Color(0xFFF2B8B5), // 인디 핑크
-        Color(0xFFE6C2A5), // 피치 오렌지
-        Color(0xFFA8C8A6), // 민트 그린
-        Color(0xFFB5C0D0), // 소프트 블루
-        Color(0xFFD3B8D8)  // 라벤더
+        Color(0xFFF2B8B5), 
+        Color(0xFFE6C2A5), 
+        Color(0xFFA8C8A6), 
+        Color(0xFFB5C0D0),
+        Color(0xFFD3B8D8)  
     )
     val backgroundColor = bookColors[index % bookColors.size]
 
