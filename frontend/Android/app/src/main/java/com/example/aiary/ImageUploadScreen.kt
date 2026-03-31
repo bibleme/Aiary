@@ -1,17 +1,18 @@
 package com.example.aiary
 
 import android.app.DatePickerDialog
+import android.util.Log
 import android.widget.DatePicker
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.PickVisualMediaRequest // 👇 필수 추가
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyRow 
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyRow // 👇 필수 추가
+import androidx.compose.foundation.lazy.items // 👇 필수 추가
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -74,7 +75,6 @@ fun ImageUploadScreen(onBack: () -> Unit) {
         calendar.get(Calendar.DAY_OF_MONTH)
     )
 
-    // 20장 다중 선택 전용 런처
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 20)
     ) { uriList ->
@@ -139,7 +139,6 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                     .height(300.dp)
                     .background(Color.White, shape = RoundedCornerShape(16.dp))
                     .clickable {
-                        // 다중 선택 갤러리를 띄우는 올바른 인텐트 방식
                         galleryLauncher.launch(
                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                         )
@@ -155,7 +154,6 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                     )
                 }
 
-                //  null 체크가 아니라 isEmpty()로 체크하고, LazyRow로 여러 장 띄우기!
                 if (selectedImageUris.isEmpty()) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(text = "+", fontSize = 50.sp, color = UploadPrimaryBlue)
@@ -222,8 +220,6 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                             val bearerToken = "Bearer $savedToken"
 
                             var successCount = 0
-
-                            // 실패했을 때 서버가 보낸 에러 내용을 담아둘 변수
                             var lastErrorCode = 0
                             var lastErrorMsg = ""
 
@@ -238,7 +234,7 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                                     if (response.isSuccessful) {
                                         successCount++
                                     } else {
-                            
+                                        // 실패 원인 기록
                                         lastErrorCode = response.code()
                                         lastErrorMsg = response.errorBody()?.string() ?: "알 수 없는 에러"
                                     }
@@ -246,11 +242,19 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                                 }
                             }
 
+                            // ... (위쪽 for문 코드는 그대로 둠) ...
+
                             if (successCount > 0) {
-                                Toast.makeText(context, "${successCount}장의 AI 일기 생성 완료!", Toast.LENGTH_LONG).show()
-                                onBack()
+                                // 업로드가 다 끝나면 서버에 "이 날짜 일기 다시 써줘!" 라고 요청
+                                try {
+                                    RetrofitClient.api.regenerateDailyDiary(selectedDate, bearerToken)
+                                } catch (e: Exception) {
+                                    Log.e("Regenerate", "일기 재생성 중 오류 발생", e)
+                                }
+
+                                Toast.makeText(context, "일기 생성 완료!", Toast.LENGTH_LONG).show()
+                                onBack() // 성공하면 홈 화면으로 돌아가기
                             } else {
-                                // 진짜 에러 원인을 토스트 메시지로 띄웁니다
                                 Toast.makeText(context, "에러($lastErrorCode): $lastErrorMsg", Toast.LENGTH_LONG).show()
                             }
 
@@ -276,7 +280,7 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                         modifier = Modifier.size(24.dp)
                     )
                 } else {
-                    Text("AI 분석 시작 (${selectedImageUris.size}장)", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text("일기 생성 시작! (${selectedImageUris.size}장)", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
         }
@@ -292,13 +296,12 @@ fun ImageUploadScreen(onBack: () -> Unit) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator(color = UploadPrimaryBlue)
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("AI가 열심히 분석 중입니다... 🤖", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("AI가 열심히 생성 중입니다... 🤖", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
     }
 }
-
 
 @Preview(showBackground = true)
 @Composable
