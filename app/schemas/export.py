@@ -1,6 +1,6 @@
 # app/schemas/export.py
 from datetime import date, datetime
-from typing import List, Optional
+from typing import List, Optional, Any
 
 from pydantic import BaseModel
 
@@ -18,11 +18,20 @@ class OneLineDiaryItem(BaseModel):
 
 class DailyDiaryItem(BaseModel):
     id: int
-    content: str
     diary_date: date
+
+    content: str   # 하위호환용 = final_content
+    generated_content: str
+    edited_content: Optional[str] = None
+    final_content: str
+
+    model_version: Optional[str] = None
+    generation_meta: Optional[Any] = None
+
     source_count: int
     created_at: datetime
     updated_at: datetime
+    edited_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

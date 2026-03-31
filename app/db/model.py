@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Text,
     UniqueConstraint,
+    JSON,
 )
 from sqlalchemy.orm import relationship, declarative_base
 
@@ -78,7 +79,16 @@ class DailyDiary(Base):
         index=True,
     )
     diary_date = Column(Date, nullable=False, index=True)
-    content = Column(Text, nullable=False)
+
+    # 기존 컬럼: 바로 삭제하지 않고 호환용으로 잠시 유지
+    content = Column(Text, nullable=True)
+
+    # 새 구조
+    generated_content = Column(Text, nullable=True)
+    edited_content = Column(Text, nullable=True)
+
+    model_version = Column(String, nullable=True)
+    generation_meta = Column(JSON, nullable=True)
 
     # 하루일기 생성 시 사용한 한줄일기 개수
     source_count = Column(Integer, nullable=False, default=0)
@@ -90,5 +100,6 @@ class DailyDiary(Base):
         onupdate=datetime.datetime.utcnow,
         nullable=False,
     )
+    edited_at = Column(DateTime, nullable=True)
 
     owner = relationship("User", back_populates="daily_diaries")

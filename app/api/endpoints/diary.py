@@ -1,5 +1,5 @@
 # app/api/endpoints/diary.py
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Optional
 from uuid import uuid4
@@ -65,16 +65,32 @@ def _serialize_diary(diary: Diary) -> dict:
         "created_at": diary.created_at,
     }
 
+def _resolve_generated_content(daily_diary: DailyDiary) -> str:
+    return daily_diary.generated_content or daily_diary.content or ""
+
+
+def _resolve_final_content(daily_diary: DailyDiary) -> str:
+    return daily_diary.edited_content or daily_diary.generated_content or daily_diary.content or ""
+
 
 def _serialize_daily_diary(daily_diary: DailyDiary) -> dict:
+    generated_content = _resolve_generated_content(daily_diary)
+    final_content = _resolve_final_content(daily_diary)
+
     return {
         "id": daily_diary.id,
         "user_id": daily_diary.user_id,
         "diary_date": daily_diary.diary_date,
-        "content": daily_diary.content,
+        "content": final_content,  # 하위호환용
+        "generated_content": generated_content,
+        "edited_content": daily_diary.edited_content,
+        "final_content": final_content,
+        "model_version": daily_diary.model_version,
+        "generation_meta": daily_diary.generation_meta,
         "source_count": daily_diary.source_count,
         "created_at": daily_diary.created_at,
         "updated_at": daily_diary.updated_at,
+        "edited_at": daily_diary.edited_at,
     }
 
 
@@ -279,10 +295,20 @@ async def create_daily_diary(
             f"one_lines_count={len(one_lines)}",
             flush=True,
         )
+        
+        
         new_daily_diary = DailyDiary(
             user_id=current_user.id,
             diary_date=target_date,
-            content=full_diary,
+            content=full_diary,  # 임시 호환용
+            generated_content=full_diary,
+            edited_content=None,
+            model_version=gen_result.get("model_version"),
+            generation_meta={
+                "one_lines_count": gen_result.get("one_lines_count"),
+                "bullet_lines": gen_result.get("bullet_lines"),
+                "combined_summary": gen_result.get("combined_summary"),
+            },
             source_count=len(one_lines),
         )
 
@@ -352,7 +378,8 @@ async def update_daily_diary(
                 detail="해당 날짜의 하루일기가 존재하지 않습니다.",
             )
 
-        existing.content = content
+        existing.edited_content = content
+        existing.edited_at = datetime.now(timezone.utc)
 
         await db.commit()
         await db.refresh(existing)
@@ -400,8 +427,17 @@ async def regenerate_daily_diary(
         existing = await _get_daily_diary(db, current_user.id, target_date)
 
         if existing:
-            existing.content = full_diary
+            existing.content = full_diary  # 임시 호환용
+            existing.generated_content = full_diary
+            existing.model_version = gen_result.get("model_version")
+            existing.generation_meta = {
+                "one_lines_count": gen_result.get("one_lines_count"),
+                "bullet_lines": gen_result.get("bullet_lines"),
+                "combined_summary": gen_result.get("combined_summary"),
+            }
             existing.source_count = len(one_lines)
+
+            # edited_content / edited_at 은 유지
             await db.commit()
             await db.refresh(existing)
             return _serialize_daily_diary(existing)
@@ -409,7 +445,15 @@ async def regenerate_daily_diary(
         new_daily_diary = DailyDiary(
             user_id=current_user.id,
             diary_date=target_date,
-            content=full_diary,
+            content=full_diary,  # 임시 호환용
+            generated_content=full_diary,
+            edited_content=None,
+            model_version=gen_result.get("model_version"),
+            generation_meta={
+                "one_lines_count": gen_result.get("one_lines_count"),
+                "bullet_lines": gen_result.get("bullet_lines"),
+                "combined_summary": gen_result.get("combined_summary"),
+            },
             source_count=len(one_lines),
         )
         db.add(new_daily_diary)

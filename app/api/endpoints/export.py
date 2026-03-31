@@ -79,7 +79,22 @@ async def get_monthly_diaries(
         )
 
     for daily in daily_diaries:
-        days_map[daily.diary_date].daily_diary = DailyDiaryItem.model_validate(daily)
+        generated_content = daily.generated_content or daily.content or ""
+        final_content = daily.edited_content or daily.generated_content or daily.content or ""
+
+        days_map[daily.diary_date].daily_diary = DailyDiaryItem(
+            id=daily.id,
+            diary_date=daily.diary_date,
+            generated_content=generated_content,
+            edited_content=daily.edited_content,
+            final_content=final_content,
+            model_version=daily.model_version,
+            generation_meta=daily.generation_meta,
+            source_count=daily.source_count,
+            created_at=daily.created_at,
+            updated_at=daily.updated_at,
+            edited_at=daily.edited_at,
+        )
 
     return MonthlyDiariesResponse(
         user_id=current_user.id,
