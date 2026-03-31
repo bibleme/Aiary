@@ -19,7 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Delete 
+import androidx.compose.material.icons.filled.Delete // 👇 [추가] 휴지통 아이콘
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,11 +41,10 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.filled.Edit
-
+import com.example.aiary.data.UpdateDiaryContentRequest
 
 private val White = Color(0xFFFFFFFF)
 
-// 삭제를 위해 서버의 고유 ID(id)를 추가로 받습니다.
 data class DiaryPhoto(
     val id: Int,
     val imageUrl: String,
@@ -99,12 +98,12 @@ fun CardDiaryScreen(
                         val baseUrl = "http://3.35.185.251:8000"
                         "$baseUrl${it.image_url}"
                     }
-                    // 서버에서 받아온 id를 함께 저장 (서버 데이터 클래스에 id가 있어야 함!)
+                    // 서버에서 받아온 id를 함께 저장 
                     DiaryPhoto(id = it.id, imageUrl = fixedUrl, comment = it.content)
                 }
 
                 if (filteredDiaries.isNotEmpty()) {
-                    // 🟢 먼저 서버에 이미 만들어진 요약 일기가 있는지 '조회(GET)' 해봅니다.
+                    // 먼저 서버에 이미 만들어진 요약 일기가 있는지 '조회(GET)' 해봅니다.
                     // (주의: ApiService.kt에 getDailyDiary가 선언되어 있어야 합니다!)
                     val getResponse = RetrofitClient.api.getDailyDiary(targetDate, myId, bearerToken)
 
@@ -112,7 +111,7 @@ fun CardDiaryScreen(
                         // 저장된 일기가 있다면? 그걸 그대로 꺼내서 보여줍니다! (일기가 매번 바뀌지 않게 됨)
                         fullDiaryText = getResponse.body()?.content ?: "내용이 없습니다."
                     } else {
-                        // 🔴 조회했는데 없다면? (처음 들어온 상태) -> 이때만 새로 '생성(POST)' 요청을 보냅니다!
+                        // 조회했는데 없다면? (처음 들어온 상태) -> 이때만 새로 '생성(POST)' 요청을 보냅니다!
                         val summaryRequest = DaySummaryRequest(myId, targetDate)
                         val createResponse = RetrofitClient.api.createDailyDiary(bearerToken, summaryRequest)
 
@@ -202,18 +201,32 @@ fun CardDiaryScreen(
                             BackSideContent(
                                 fullDiaryText = fullDiaryText,
                                 onSaveClick = { updatedText ->
-                                    // 화면에 보이는 글씨를 즉시 바뀐 글로 업데이트합니다.
                                     fullDiaryText = updatedText
 
-                                    // 서버에 바뀐 글을 전송합니다 (임시 코드)
+                                    // 서버에 수정된 글을 전송
                                     coroutineScope.launch {
                                         try {
-                                            // RetrofitClient.api.updateFullDiary(...)
-                                            // RetrofitClient.api.
+                                            // 토큰이랑 날짜 준비
+                                            val bearerToken = "Bearer ${UserSession.accessToken}"
+                                            val targetDate = convertKoreanDateToIso(selectedDate)
 
-                                            Toast.makeText(context, "일기가 수정되었습니다!", Toast.LENGTH_SHORT).show()
+                                            // 방금 만든 포장 박스에 바뀐 글씨 담기
+                                            val request = UpdateDiaryContentRequest(content = updatedText)
+
+                                            // ApiService 호출!
+                                            val response = RetrofitClient.api.updateDailyDiary(targetDate,
+                                                bearerToken, request)
+
+                                            if (response.isSuccessful) {
+                                                Toast.makeText(context, "일기가 수정되었습니다!",
+                                                    Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                Toast.makeText(context, "수정 실패: ${response.code()}",
+                                                    Toast.LENGTH_SHORT).show()
+                                            }
                                         } catch (e: Exception) {
-                                            Toast.makeText(context, "수정 저장 실패", Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "통신 오류가 발생했습니다.",
+                                                Toast.LENGTH_SHORT).show()
                                         }
                                     }
                                 }
@@ -254,7 +267,7 @@ fun CardDiaryScreen(
                 TextButton(
                     onClick = {
                         val deleteId = photoIdToDelete!!
-                        photoIdToDelete = null // 팝업 닫기
+                        photoIdToDelete = null 
                         isLoading = true
 
                         // 서버에 삭제 요청
@@ -262,11 +275,29 @@ fun CardDiaryScreen(
                             try {
                                 val myId = UserSession.userId
                                 val bearerToken = "Bearer ${UserSession.accessToken}"
-                                val response = RetrofitClient.api.deleteDiary(deleteId, myId, bearerToken)// 백엔드에 만들어둔 삭제 API 호출!
+                                val response = RetrofitClient.api.deleteDiary(deleteId, myId, bearerToken)
+
                                 if (response.isSuccessful) {
-                                    Toast.makeText(context, "삭제되었습니다.", Toast.LENGTH_SHORT).show()
-                                    // 방금 지운 사진을 내 폰 화면(리스트)에서도 제거
+                                    Toast.makeText(context, "사진이 삭제되었습니다.", Toast.LENGTH_SHORT).show()
+                                    // 🗑️ 방금 지운 사진을 화면(리스트)에서 제거
                                     diaryPhotos = diaryPhotos.filter { it.id != deleteId }
+
+                                    // 사진을 지웠으니 일기도 재생성 요청!
+                                    if (diaryPhotos.isNotEmpty()) {
+                                        val targetDate = convertKoreanDateToIso(selectedDate)
+                                        val regenResponse = RetrofitClient.api.regenerateDailyDiary(targetDate, bearerToken)
+
+                                        if (regenResponse.isSuccessful && regenResponse.body() != null) {
+                                            // 재생성된 새 일기로 화면 글씨 업데이트!
+                                            fullDiaryText = regenResponse.body()?.content ?: fullDiaryText
+                                            Toast.makeText(context, "남은 사진에 맞게 일기가 다시 작성되었습니다!",
+                                                Toast.LENGTH_SHORT).show()
+                                        }
+                                    } else {
+                                        // 사진이 0장이 되면 일기도 비워주기
+                                        fullDiaryText = "작성된 일기가 없는 날입니다."
+                                    }
+
                                 } else {
                                     Toast.makeText(context, "삭제 실패: ${response.code()}", Toast.LENGTH_SHORT).show()
                                 }
@@ -337,7 +368,7 @@ fun FrontSideContent(
                 }
             }
 
-            // 이전 / 다음 버튼
+            // 이전 / 다음 버튼 
             if (pagerState.currentPage > 0) {
                 IconButton(
                     onClick = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
@@ -391,7 +422,7 @@ fun BackSideContent(
             .padding(24.dp)
             .heightIn(min = 350.dp, max = 500.dp)
     ) {
-        // 윗부분: 제목과 수정/저장 버튼 
+        // --- 윗부분: 제목과 수정/저장 버튼 ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -415,10 +446,12 @@ fun BackSideContent(
                         Text("취소", color = Color.Gray)
                     }
                     TextButton(onClick = {
-                        onSaveClick(editedText) // 부모 화면으로 수정된 텍스트 전달!
+                        onSaveClick(editedText) // 부모 화면으로 수정된 텍스트 전달
                         isEditing = false
                     }) {
                         Text("저장", color = PrimaryBlue, fontWeight = FontWeight.Bold)
+
+
                     }
                 }
             } else {
