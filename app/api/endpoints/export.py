@@ -1,5 +1,7 @@
 # app/api/endpoints/export.py
+
 import calendar
+from collections import defaultdict
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -9,10 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.database import get_db_session
 from app.db.model import Diary, DailyDiary, User
 from app.schemas.export import (
+    AdminOneLineDiaryItem,
     DailyDiaryItem,
     MonthlyDiariesResponse,
     MonthlyDiaryDay,
     OneLineDiaryItem,
+    UserDiariesResponse,
 )
 from app.services.security import get_current_user
 
@@ -103,3 +107,46 @@ async def get_monthly_diaries(
         month=month,
         days=list(days_map.values()),
     )
+    
+    
+@router.get("/admin/one-line-list", response_model=list[UserDiariesResponse])
+async def get_all_users_diaries_for_admin(
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    내부/개발용:
+    전체 유저의 한줄일기를 user_id별로 묶어서 반환한다.
+    현재는 관리자 권한 필드가 없으므로, 인증 사용자만 접근 가능하게 두고
+    추후 admin role 도입 시 권한 제한을 강화한다.
+    """
+    stmt = (
+        select(Diary)
+        .order_by(Diary.user_id.asc(), Diary.diary_date.asc(), Diary.id.asc())
+    )
+    result = await db.execute(stmt)
+    all_diaries = result.scalars().all()
+
+    grouped_diaries = defaultdict(list)
+
+    for diary in all_diaries:
+        grouped_diaries[diary.user_id].append(
+            AdminOneLineDiaryItem(
+                id=diary.id,
+                content=diary.content,
+                image_url=diary.image_url,
+                diary_date=diary.diary_date,
+                created_at=diary.created_at,
+            )
+        )
+
+    response_data = []
+    for uid in sorted(grouped_diaries.keys()):
+        response_data.append(
+            UserDiariesResponse(
+                user_id=uid,
+                diaries=grouped_diaries[uid],
+            )
+        )
+
+    return response_data

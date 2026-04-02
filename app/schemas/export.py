@@ -48,3 +48,19 @@ class MonthlyDiariesResponse(BaseModel):
     year: int
     month: int
     days: List[MonthlyDiaryDay]
+    
+    
+class AdminOneLineDiaryItem(BaseModel):
+    id: int
+    content: str
+    image_url: str
+    diary_date: date
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class UserDiariesResponse(BaseModel):
+    user_id: int
+    diaries: List[AdminOneLineDiaryItem]    
