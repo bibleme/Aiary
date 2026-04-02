@@ -217,26 +217,38 @@ async def process_vision_analysis(diary_id: int, image_path: str, db: AsyncSessi
         person_crop = img_cv2[y1:y2, x1:x2]
         
         is_child, emotion_str = False, "Unknown"
-        if person_crop.size > 0 and os.path.exists(REF_CHILD_IMG):
+        
+        if person_crop.size > 0:
+            # 1. 누구든 일단 감정부터 읽어봅니다.
             try:
-                res_verify = DeepFace.verify(img1_path=person_crop, img2_path=REF_CHILD_IMG, enforce_detection=False, silent=True)
-                if res_verify['verified']:
-                    is_child = True
-                    res_emo = DeepFace.analyze(img_path=person_crop, actions=['emotion'], enforce_detection=False, silent=True)
-                    emotion_str = res_emo[0]['dominant_emotion']
-            except Exception: 
-                pass 
+                res_emo = DeepFace.analyze(img_path=person_crop, actions=['emotion'], enforce_detection=False, silent=True)
+                emotion_str = res_emo[0]['dominant_emotion']
+            except Exception as e:
+                # 🚨 여기서 에러가 찍히면 얼굴이 너무 작거나 가중치 파일이 없는 겁니다.
+                print(f"❌ Emotion Analysis Failed: {e}")
+                emotion_str = "Hidden"
+
+            # 2. 우리 아이인지 확인합니다.
+            if os.path.exists(REF_CHILD_IMG):
+                try:
+                    res_verify = DeepFace.verify(img1_path=person_crop, img2_path=REF_CHILD_IMG, enforce_detection=False, silent=True)
+                    if res_verify['verified']:
+                        is_child = True
+                except Exception as e:
+                    print(f"⚠️ Verification Failed: {e}")
         
         if is_child: target_child_found = True
         temp_persons.append({"p_data": p_data, "box": box, "is_child": is_child, "emotion_str": emotion_str})
         
     for tp in temp_persons:
+        # 3. 역할 배정 로직 (감정을 강제로 덮어쓰지 않도록 수정)
         if tp["is_child"]: 
             role_name = "Target_Child"
         elif not target_child_found: 
-            role_name, tp["emotion_str"] = "Assumed_Child", "Hidden"
+            role_name = "Assumed_Child" 
         else: 
             role_name = "Adult_Helper"
+            tp["emotion_str"] = "Neutral" # 어른은 통계 방지용
                 
         # [DB] Person & Appearance 저장
         new_person = VisionPerson(role=role_name, emotion=tp["emotion_str"])

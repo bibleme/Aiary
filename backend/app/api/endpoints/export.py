@@ -87,3 +87,26 @@ async def get_monthly_diaries(
         month=month,
         days=list(days_map.values()),
     )
+
+from typing import List # 상단 import문에 List가 없다면 추가해주세요.
+
+@router.get("/one-line-list", response_model=List[OneLineDiaryItem])
+async def get_all_one_line_diaries(
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    로그인한 사용자의 모든 한 줄 일기 데이터를 ID 순(또는 날짜 순)으로 한 줄씩 리스트로 반환합니다.
+    별도의 날짜 지정 없이 전체 데이터를 조회합니다.
+    """
+    stmt = (
+        select(Diary)
+        .where(Diary.user_id == current_user.id)
+        .order_by(Diary.diary_date.asc(), Diary.id.asc()) # 최신순 정렬
+    )
+    
+    result = await db.execute(stmt)
+    diaries = result.scalars().all()
+
+    # OneLineDiaryItem 스키마를 사용하여 리스트로 변환하여 반환
+    return [OneLineDiaryItem.model_validate(diary) for diary in diaries]

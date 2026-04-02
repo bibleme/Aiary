@@ -46,3 +46,5 @@ main.py.bak_*
 
 media/images/
 one_lines
+
+**/*.pt
