@@ -1,7 +1,7 @@
 # app/api/endpoints/export.py
 import calendar
 from datetime import date
-
+from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +17,12 @@ from app.schemas.export import (
 from app.services.security import get_current_user
 
 router = APIRouter(prefix="/exports", tags=["exports"])
+
+from typing import List
+from pydantic import BaseModel
+class UserDiariesResponse(BaseModel):
+    user_id: int
+    diaries: List[OneLineDiaryItem]
 
 
 @router.get("/monthly-diaries", response_model=MonthlyDiariesResponse)
@@ -88,25 +94,32 @@ async def get_monthly_diaries(
         days=list(days_map.values()),
     )
 
-from typing import List # 상단 import문에 List가 없다면 추가해주세요.
-
-@router.get("/one-line-list", response_model=List[OneLineDiaryItem])
-async def get_all_one_line_diaries(
-    db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
+@router.get("/admin/one-line-list", response_model=List[UserDiariesResponse])
+async def get_all_users_diaries_for_admin(
+    db: AsyncSession = Depends(get_db_session)
 ):
     """
-    로그인한 사용자의 모든 한 줄 일기 데이터를 ID 순(또는 날짜 순)으로 한 줄씩 리스트로 반환합니다.
-    별도의 날짜 지정 없이 전체 데이터를 조회합니다.
+    [개발자/관리자 전용] 모든 유저의 한 줄 일기를 가져와서,
+    user_id가 명시된 리스트 형태로 반환합니다. (정렬 완벽 보장)
     """
+    # 🌟 수정 포인트 1: 정렬 기준 마지막에 'Diary.id.desc()'를 추가!
+    # (유저순 -> 날짜 최신순 -> 같은 날짜면 ID 최신순)
     stmt = (
         select(Diary)
-        .where(Diary.user_id == current_user.id)
-        .order_by(Diary.diary_date.asc(), Diary.id.asc()) # 최신순 정렬
+        .order_by(Diary.user_id.asc(), Diary.diary_date.asc(), Diary.id.asc())
     )
-    
     result = await db.execute(stmt)
-    diaries = result.scalars().all()
+    all_diaries = result.scalars().all()
 
-    # OneLineDiaryItem 스키마를 사용하여 리스트로 변환하여 반환
-    return [OneLineDiaryItem.model_validate(diary) for diary in diaries]
+    grouped_diaries = defaultdict(list)
+    for diary in all_diaries:
+        grouped_diaries[diary.user_id].append(OneLineDiaryItem.model_validate(diary))
+
+    response_data = []
+    # 🌟 수정 포인트 2: response_data에 담을 때 user_id를 '명시적으로 오름차순 정렬'해서 담기
+    for uid in sorted(grouped_diaries.keys()):
+        response_data.append(
+            UserDiariesResponse(user_id=uid, diaries=grouped_diaries[uid])
+        )
+
+    return response_data
