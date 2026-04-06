@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api.endpoints import user, diary, export
+from app.api.endpoints import user, diary, export, monthly_report
 from app.config import settings
 
 app = FastAPI(title="Aiary")
@@ -44,6 +44,7 @@ app.mount("/media", StaticFiles(directory=str(MEDIA_DIR)), name="media")
 app.include_router(user.router)
 app.include_router(diary.router)
 app.include_router(export.router)
+app.include_router(monthly_report.router)
 
 
 @app.get("/")

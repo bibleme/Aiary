@@ -17,6 +17,8 @@ class Settings(BaseSettings):
         env_file=".env",
         extra="ignore",
     )
+    
+    MONTHLY_REPORT_JSON_PATH: str = "/home/ubuntu/aiary-assets/reports/monthly/v3/monthly_reports_v3.json"
 
 
 settings = Settings()
