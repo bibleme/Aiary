@@ -111,19 +111,28 @@ async def get_monthly_diaries(
     
 @router.get("/admin/one-line-list", response_model=list[UserDiariesResponse])
 async def get_all_users_diaries_for_admin(
+    user_id: int | None = Query(
+        None,
+        description="특정 유저의 한줄일기만 조회하고 싶을 때 사용",
+    ),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
     """
     내부/개발용:
     전체 유저의 한줄일기를 user_id별로 묶어서 반환한다.
+    user_id가 주어지면 해당 유저의 한줄일기만 반환한다.
+
     현재는 관리자 권한 필드가 없으므로, 인증 사용자만 접근 가능하게 두고
     추후 admin role 도입 시 권한 제한을 강화한다.
     """
-    stmt = (
-        select(Diary)
-        .order_by(Diary.user_id.asc(), Diary.diary_date.asc(), Diary.id.asc())
-    )
+    stmt = select(Diary)
+
+    if user_id is not None:
+        stmt = stmt.where(Diary.user_id == user_id)
+
+    stmt = stmt.order_by(Diary.user_id.asc(), Diary.diary_date.asc(), Diary.id.asc())
+
     result = await db.execute(stmt)
     all_diaries = result.scalars().all()
 
