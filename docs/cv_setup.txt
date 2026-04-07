@@ -1,0 +1,13 @@
+
+## 1. 모델 파일 (.pt) 수동 세팅 안내
+용량 문제로 YOLO 가중치 파일은 압축 파일에 포함하지 못했습니다.
+- yolo26m-pose.pt (관절/포즈 인식용)
+https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo26m-pose.pt
+- yolo26m.pt (사물 인식용)
+https://github.com/ultralytics/assets/releases/download/v8.4.0/yolo26m.pt
+
+## 2. 자동 다운로드 모델 안내
+YOLO를 제외한 아래 모델들은 서버 최초 구동 시 인터넷을 통해 자동으로 캐시 폴더에 다운로드됩니다. (서버망에 인터넷 연결 필수)
+- DeepFace (VGG-Face): ~/.deepface/weights/ 에 저장됨
+- CLIP (ViT-B/32): ~/.cache/clip/ 에 저장됨
+- SigLIP (google/siglip-base): ~/.cache/huggingface/ 에 저장됨
