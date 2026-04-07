@@ -1,8 +1,8 @@
-#app/services/monthly_report_generator.py
+# app/services/monthly_report_generator.py
 import hashlib
 import json
 import re
-from collections import Counter, defaultdict
+from collections import Counter
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
@@ -204,6 +204,42 @@ def build_keyword_bundle(
     }
 
 
+def _dedupe_photo_records(records: List[dict]) -> List[dict]:
+    seen = set()
+    out = []
+    for r in records:
+        key = (
+            r.get("diary_id"),
+            r.get("image_url"),
+            r.get("date"),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(r)
+    return out
+
+
+def _normalize_semantic_label(text: str) -> str:
+    if not text:
+        return ""
+
+    text = str(text).strip()
+
+    mapping = {
+        "어린아이": "아이",
+        "아기": "아이",
+        "어린이": "아이",
+        "장난감 총": "장난감",
+        "간식/먹기": "먹기",
+        "식사 시간": "먹기",
+        "가족": "가족",
+        "형제": "형제",
+    }
+
+    return mapping.get(text, text)
+
+
 def _parse_target_month(target_month: str) -> tuple[date, date]:
     if len(target_month) != 7 or target_month[4] != "-":
         raise ValueError("target_month는 YYYY-MM 형식이어야 합니다.")
@@ -277,7 +313,6 @@ def _load_scene_cache(user_id: int, target_month: str) -> dict[int, dict]:
         if diary_id is None:
             continue
 
-        # normalize list fields like notebook
         for col in ["places", "objects", "companions", "photo_keywords"]:
             if col in item and isinstance(item[col], list):
                 item[col] = sorted(set([str(v).strip() for v in item[col] if str(v).strip()]))
@@ -365,20 +400,16 @@ def rule_based_scene_extract_row(diary: Diary, target_month: str) -> List[Dict[s
 
 def _get_scenes_for_month(diaries: list[Diary], target_month: str, scene_map: dict[int, dict]) -> list[dict]:
     all_scenes = []
-
     for diary in diaries:
         cached = scene_map.get(diary.id)
         if cached:
             all_scenes.append(cached)
         else:
             all_scenes.extend(rule_based_scene_extract_row(diary, target_month))
-
     return all_scenes
 
 
 def _group_synonyms(items: list[str]) -> list[list[str]]:
-    # notebook의 완전한 synonym grouping 코드를 아직 서버에 그대로 옮기지 못했으므로
-    # 지금은 동일 문자열 기준 최소 그룹화
     counter = Counter([x for x in items if x])
     groups = []
     for item, _ in counter.most_common():
@@ -397,6 +428,7 @@ def _build_keyword_photo_index(scenes: list[dict]) -> dict[str, dict]:
             "content": sc["content"],
         }
         for kw in sc.get("photo_keywords", []):
+            kw = _normalize_semantic_label(kw)
             if kw not in index:
                 index[kw] = {
                     "keyword": kw,
@@ -411,48 +443,61 @@ def _build_keyword_photo_index(scenes: list[dict]) -> dict[str, dict]:
 
     for item in index.values():
         item["dates"] = sorted(set(item["dates"]))
-        seen = set()
-        uniq = []
-        for p in item["photos"]:
-            if p["diary_id"] not in seen:
-                seen.add(p["diary_id"])
-                uniq.append(p)
-        item["photos"] = uniq
+        item["photos"] = _dedupe_photo_records(item["photos"])
 
     return index
 
 
 def _compute_monthly_stats(scenes: list[dict]) -> dict:
     action_counter = Counter()
+    category_counter = Counter()
     object_counter = Counter()
     place_counter = Counter()
     companion_counter = Counter()
 
+    normalized_scenes = []
+
     for sc in scenes:
-        semantic_action = sc.get("semantic_action", sc.get("action_label"))
-        if semantic_action:
-            action_counter[semantic_action] += 1
-        object_counter.update(sc.get("objects", []))
-        place_counter.update(sc.get("places", []))
-        companion_counter.update(sc.get("companions", []))
+        sc = dict(sc)
+
+        sc["semantic_action"] = _normalize_semantic_label(
+            sc.get("semantic_action") or sc.get("action_label")
+        )
+
+        sc["objects"] = [_normalize_semantic_label(x) for x in sc.get("objects", [])]
+        sc["places"] = [_normalize_semantic_label(x) for x in sc.get("places", [])]
+        sc["companions"] = [_normalize_semantic_label(x) for x in sc.get("companions", [])]
+        sc["photo_keywords"] = [_normalize_semantic_label(x) for x in sc.get("photo_keywords", [])]
+
+        normalized_scenes.append(sc)
+
+        if sc["semantic_action"]:
+            action_counter[sc["semantic_action"]] += 1
+        if sc.get("category"):
+            category_counter[sc["category"]] += 1
+
+        object_counter.update(sc["objects"])
+        place_counter.update(sc["places"])
+        companion_counter.update(sc["companions"])
 
     action_groups = _group_synonyms(list(action_counter.elements()))
     keyword_groups = _group_synonyms(
         list(object_counter.elements()) + list(place_counter.elements()) + list(companion_counter.elements())
     )
 
-    keyword_photo_index = _build_keyword_photo_index(scenes)
+    keyword_photo_index = _build_keyword_photo_index(normalized_scenes)
 
     return {
-        "top_actions": action_counter.most_common(10),
-        "top_objects": object_counter.most_common(10),
-        "top_places": place_counter.most_common(10),
-        "top_companions": companion_counter.most_common(10),
+        "top_actions": action_counter.most_common(5),
+        "top_categories": category_counter.most_common(5),
+        "top_objects": object_counter.most_common(5),
+        "top_places": place_counter.most_common(5),
+        "top_companions": companion_counter.most_common(5),
         "new_actions": [k for k, v in action_counter.items() if v == 1],
         "action_synonym_groups": action_groups,
         "keyword_synonym_groups": keyword_groups,
         "keyword_photo_index": keyword_photo_index,
-        "raw_scenes": scenes,
+        "raw_scenes": normalized_scenes,
     }
 
 
@@ -572,13 +617,13 @@ def make_rule_based_month_report(target_month: str, month_stat: Dict[str, Any], 
     }
 
     for row in highlights:
-        date_photos = [{
+        date_photos = _dedupe_photo_records([{
             "diary_id": row["diary_id"],
             "date": row["date"],
             "image_url": row["source_image_url"],
             "full_image_url": row["source_full_image_url"],
             "content": row["content"],
-        }]
+        }])
 
         keywords = []
         for keyword in [
@@ -618,7 +663,7 @@ def make_rule_based_month_report(target_month: str, month_stat: Dict[str, Any], 
     report["keyword_photo_index"] = month_stat["keyword_photo_index"]
     report["action_synonym_groups"] = month_stat.get("action_synonym_groups", [])
     report["keyword_synonym_groups"] = month_stat.get("keyword_synonym_groups", [])
-    report["photo_library"] = [
+    report["photo_library"] = _dedupe_photo_records([
         {
             "diary_id": r["diary_id"],
             "date": r["date"],
@@ -627,8 +672,90 @@ def make_rule_based_month_report(target_month: str, month_stat: Dict[str, Any], 
             "content": r["content"],
         }
         for r in month_stat["raw_scenes"]
-    ]
+    ])
     return report
+
+
+async def gpt_compose_month_report(
+    user_id: int,
+    target_month: str,
+    month_stat: Dict[str, Any],
+    highlights: List[dict],
+) -> Dict[str, str]:
+    from openai import AsyncOpenAI
+
+    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+
+    top_actions = [x[0] for x in month_stat.get("top_actions", [])]
+    top_categories = [x[0] for x in month_stat.get("top_categories", [])]
+    top_places = [x[0] for x in month_stat.get("top_places", [])]
+    top_objects = [x[0] for x in month_stat.get("top_objects", [])]
+    top_companions = [x[0] for x in month_stat.get("top_companions", [])]
+    new_actions = month_stat.get("new_actions", [])
+
+    highlight_lines = []
+    for row in highlights:
+        highlight_lines.append(
+            f"- date={row['date']}, action={row.get('semantic_action', row['action_label'])}, "
+            f"places={row.get('places', [])}, objects={row.get('objects', [])}, companions={row.get('companions', [])}, "
+            f"raw_text={row.get('raw_text', '')}"
+        )
+
+    prompt = f"""
+너는 '부모에게 전달되는 월간 육아 리포트'를 작성하는 전문가다.
+
+목표:
+- 데이터 기반이지만, 따뜻하고 자연스러운 문장으로 작성한다.
+- 부모가 읽었을 때 아이의 한 달이 떠오르도록 쓴다.
+
+작성 스타일:
+- 과장된 감성 표현은 금지
+- 담백하고 따뜻하게
+- 관찰 기반 + 해석 형태로 작성
+
+반드시 아래 5개 필드만 JSON으로 출력하라:
+{{
+  "month_overview": "...",
+  "pattern_summary": "...",
+  "change_summary": "...",
+  "parent_note": "...",
+  "one_line_summary": "..."
+}}
+
+입력 데이터:
+user_id={user_id}
+month={target_month}
+top_actions={top_actions}
+top_categories={top_categories}
+top_places={top_places}
+top_objects={top_objects}
+top_companions={top_companions}
+new_actions={new_actions}
+
+대표 하이라이트:
+{chr(10).join(highlight_lines)}
+""".strip()
+
+    resp = await client.responses.create(
+        model=settings.MONTHLY_REPORT_OPENAI_MODEL,
+        input=prompt,
+    )
+
+    text = resp.output_text.strip()
+    data = json.loads(text)
+
+    required = [
+        "month_overview",
+        "pattern_summary",
+        "change_summary",
+        "parent_note",
+        "one_line_summary",
+    ]
+    for key in required:
+        if key not in data:
+            raise ValueError(f"GPT month report missing field: {key}")
+
+    return data
 
 
 async def generate_monthly_report_payload(
@@ -648,9 +775,44 @@ async def generate_monthly_report_payload(
     month_stat = _compute_monthly_stats(scenes)
     highlights = _select_highlights(month_stat, top_k=3)
 
-    # 현재 서버에서는 GPT_REPORT는 옵션으로 남겨둔다.
-    # notebook과 동일한 shape를 유지하되, 기본은 rule 기반.
-    report = make_rule_based_month_report(target_month, month_stat, highlights)
+    if settings.MONTHLY_REPORT_USE_GPT_REPORT:
+        try:
+            gpt_report = await gpt_compose_month_report(
+                user_id=user_id,
+                target_month=target_month,
+                month_stat=month_stat,
+                highlights=highlights,
+            )
+
+            rule_report = make_rule_based_month_report(target_month, month_stat, highlights)
+
+            report = {
+                "month": target_month,
+                "mode": "gpt",
+                **gpt_report,
+                "highlights": rule_report["highlights"],
+                "keyword_annotations": {
+                    field: annotate_text(gpt_report[field], month_stat["keyword_photo_index"])
+                    for field in ["month_overview", "pattern_summary", "change_summary", "parent_note", "one_line_summary"]
+                },
+                "keyword_photo_index": month_stat["keyword_photo_index"],
+                "action_synonym_groups": month_stat.get("action_synonym_groups", []),
+                "keyword_synonym_groups": month_stat.get("keyword_synonym_groups", []),
+                "photo_library": _dedupe_photo_records([
+                    {
+                        "diary_id": r["diary_id"],
+                        "date": r["date"],
+                        "image_url": r["source_image_url"],
+                        "full_image_url": r["source_full_image_url"],
+                        "content": r["content"],
+                    }
+                    for r in month_stat["raw_scenes"]
+                ]),
+            }
+        except Exception:
+            report = make_rule_based_month_report(target_month, month_stat, highlights)
+    else:
+        report = make_rule_based_month_report(target_month, month_stat, highlights)
 
     report["user_id"] = user_id
     report["generated_at"] = datetime.utcnow().isoformat()
@@ -731,7 +893,7 @@ async def generate_and_store_monthly_report(
         stored.source_diary_count = snapshot["source_diary_count"]
         stored.source_hash = snapshot["source_hash"]
         stored.last_source_created_at = snapshot["last_source_created_at"]
-        stored.generation_version = "report_v4_notebook_like_server_v3"
+        stored.generation_version = "report_v4_notebook_like_server_v4"
     else:
         stored = MonthlyReport(
             user_id=user_id,
@@ -740,7 +902,7 @@ async def generate_and_store_monthly_report(
             source_diary_count=snapshot["source_diary_count"],
             source_hash=snapshot["source_hash"],
             last_source_created_at=snapshot["last_source_created_at"],
-            generation_version="report_v4_notebook_like_server_v3",
+            generation_version="report_v4_notebook_like_server_v4",
         )
         db.add(stored)
 
