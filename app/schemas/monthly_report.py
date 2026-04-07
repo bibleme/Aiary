@@ -64,3 +64,14 @@ class MonthlyReportResponse(BaseModel):
     photo_library: List[ReportPhotoRef] = []
 
     generated_at: Optional[datetime] = None
+    
+class MonthlyReportStatusResponse(BaseModel):
+    user_id: int
+    month: str
+    exists: bool
+    is_up_to_date: bool
+    source_diary_count: int
+    stored_source_diary_count: Optional[int] = None
+    generated_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+    reason: Optional[str] = None
