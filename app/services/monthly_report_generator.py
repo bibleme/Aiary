@@ -559,48 +559,34 @@ content={diary.content}
 
     return _normalize_scene_list(data, diary, target_month)
 
-
 async def _get_scenes_for_month(diaries: list[Diary], target_month: str, scene_map: dict[int, dict]) -> list[dict]:
     all_scenes = []
 
     for diary in diaries:
         cached = scene_map.get(diary.id)
         if cached:
-            logger.info(
-                "[SCENE CACHE USED] diary_id=%s target_month=%s",
-                diary.id,
-                target_month,
-            )
+            print(f"[SCENE CACHE USED] diary_id={diary.id} target_month={target_month}")
             all_scenes.append(cached)
             continue
 
         if getattr(settings, "MONTHLY_REPORT_USE_GPT_SCENE", False):
             try:
                 gpt_scenes = await gpt_scene_extract_row(diary, target_month)
-                logger.info(
-                    "[SCENE GPT SUCCESS] diary_id=%s target_month=%s scene_count=%s",
-                    diary.id,
-                    target_month,
-                    len(gpt_scenes),
+                print(
+                    f"[SCENE GPT SUCCESS] diary_id={diary.id} target_month={target_month} scene_count={len(gpt_scenes)}"
                 )
                 all_scenes.extend(gpt_scenes)
                 continue
             except Exception as e:
-                logger.warning(
-                    "[SCENE GPT FALLBACK] diary_id=%s target_month=%s error=%s",
-                    diary.id,
-                    target_month,
-                    e,
+                print(
+                    f"[SCENE GPT FALLBACK] diary_id={diary.id} target_month={target_month} error={e}"
                 )
 
-        logger.info(
-            "[SCENE RULE USED] diary_id=%s target_month=%s",
-            diary.id,
-            target_month,
-        )
+        print(f"[SCENE RULE USED] diary_id={diary.id} target_month={target_month}")
         all_scenes.extend(rule_based_scene_extract_row(diary, target_month))
 
     return all_scenes
+
 
 def _group_synonyms(items: list[str]) -> list[list[str]]:
     counter = Counter([x for x in items if x])
