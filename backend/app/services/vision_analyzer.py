@@ -1,10 +1,10 @@
-# app/services/vision_analyzer.py
 import os
 import gc
 import json
 import cv2
 import torch
 import torch.nn.functional as F
+import datetime
 from PIL import Image
 
 # ML Models
@@ -27,17 +27,38 @@ from app.db.model import (
 )
 
 # ----------------------------
-# 글로벌 캐시 (모델 재사용)
+# 글로벌 캐시 및 매핑
 # ----------------------------
 _models_dict = {}
 _is_models_loaded = False
 DEVICE = None
 
-# 경로 설정 (필요시 app.config.settings 로 이동 권장)
+# 🌟 기획서에 맞춘 CLIP 장소 4분류 프롬프트
+PROMPT_TO_TAG = {
+    "a photo of a residential home interior or living room": "Routine_Indoor",
+    "a photo of a house with play mats and toys": "Routine_Indoor",
+    "a photo of a daycare center or kindergarten classroom": "Routine_Indoor",
+    "a photo of a kids cafe or indoor children's playground": "Routine_Indoor",
+    "a photo of an aquarium or museum interior": "Special_Outing",
+    "a photo of an exhibition or art gallery": "Special_Outing",
+    "a photo of an indoor amusement park or large shopping mall": "Special_Outing",
+    "a photo of a fancy restaurant, cafe, or hotel interior": "Special_Outing",
+    "a photo of a nature park, forest, or outdoor playground": "Outdoor_Outing",
+    "a photo of the beach or sea": "Outdoor_Outing",
+    "a photo of a zoo or botanical garden": "Outdoor_Outing",
+    "a photo of a city street or outdoor building exterior": "Outdoor_Outing",
+    "an extreme close-up photo of an object, food, or toy": "No_Scene",
+    "a blurry photo or texture without a visible background": "No_Scene",
+    "a photo of a plain floor, wall, or ceiling": "No_Scene"
+}
+
+# 경로 설정
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../"))
 YOLO_POSE_MODEL = os.path.join(BASE_DIR, "models/yolo26m-pose.pt")
 YOLO_OBJ_MODEL  = os.path.join(BASE_DIR, "models/yolo26m.pt")
-REF_CHILD_IMG   = os.path.join(BASE_DIR, "data/my_child_ref.jpg")
+
+# 🌟 기준 사진 경로를 media/images 폴더로 변경!
+REF_CHILD_IMG   = os.path.join(BASE_DIR, "media/images/my_child_ref.jpg")
 
 # ----------------------------
 # Device & Memory
@@ -60,7 +81,7 @@ def cleanup_torch():
             pass
 
 # ----------------------------
-# 모델 로드 (서버 켤 때 1번만 실행)
+# 모델 로드
 # ----------------------------
 def load_vision_models():
     global _models_dict, _is_models_loaded, DEVICE
@@ -116,10 +137,8 @@ def get_siglip_embedding(processor, model, img_pil, box):
     
     inputs = processor(images=cropped_img, return_tensors="pt").to(DEVICE)
     with torch.inference_mode():
-        # 1. 텍스트 파트는 깨우지 말고, '이미지 특징'만 뽑아내라고 정확히 명령!
         outputs = model.get_image_features(**inputs)
         
-        # 2. 허깅페이스 버전에 따라 상자에 담겨올 수도, 그냥 올 수도 있으므로 철저하게 대비 (안전한 상자깡)
         if hasattr(outputs, 'pooler_output'):
             embeds = outputs.pooler_output
         elif hasattr(outputs, 'image_embeds'):
@@ -127,9 +146,8 @@ def get_siglip_embedding(processor, model, img_pil, box):
         elif isinstance(outputs, tuple) or isinstance(outputs, list):
             embeds = outputs[0]
         else:
-            embeds = outputs  # 이미 알맹이(Tensor) 상태로 나온 경우
+            embeds = outputs 
             
-        # 3. 안전하게 꺼낸 알맹이에 대고 수학 계산(정규화) 수행
         features = F.normalize(embeds, dim=-1)
         
     return features.cpu().flatten()
@@ -144,12 +162,8 @@ def calculate_center(box):
 # Inference & Async DB Storage
 # ----------------------------
 async def process_vision_analysis(diary_id: int, image_path: str, db: AsyncSession):
-    """
-    FastAPI 라우터에서 호출할 공식 비전 분석 함수.
-    """
     models = load_vision_models()
     
-    # 모델 꺼내기
     model_yolo_pose = models['yolo_pose']
     model_yolo_obj = models['yolo_obj']
     model_clip = models['clip']
@@ -159,25 +173,36 @@ async def process_vision_analysis(diary_id: int, image_path: str, db: AsyncSessi
 
     print(f"[{os.path.basename(image_path)}] 비전 분석 시작...")
 
-    # 1. CLIP: 장소 분석
+    # 1. CLIP: 장소 분석 (🌟 4분류 로직 적용)
     img_pil = Image.open(image_path).convert('RGB')
     img_tensor = preprocess_clip(img_pil).unsqueeze(0).to(DEVICE)
-    text_inputs = clip.tokenize(["a photo of an indoor room", "a photo of an outdoor nature or street"]).to(DEVICE)
+    
+    all_prompts = list(PROMPT_TO_TAG.keys())
+    text_inputs = clip.tokenize(all_prompts).to(DEVICE)
     
     with torch.inference_mode():
         image_features = model_clip.encode_image(img_tensor)
+        
+        # 임베딩 벡터 정규화 및 저장용 리스트 생성
+        image_features_norm = F.normalize(image_features, dim=-1)
+        scene_vector_list = image_features_norm.cpu().flatten().tolist()
+        
         text_features = model_clip.encode_text(text_inputs)
-        similarity = (100.0 * image_features @ text_features.T).softmax(dim=-1)
-        scene_result = "Indoor" if similarity[0][0].item() > 0.5 else "Outdoor"
+        text_features_norm = F.normalize(text_features, dim=-1)
+        
+        # 4분류 프롬프트와 매칭하여 가장 높은 확률의 태그 추출
+        similarities = (image_features_norm @ text_features_norm.T).squeeze(0)
+        scene_result = PROMPT_TO_TAG[all_prompts[similarities.argmax().item()]]
 
     # [DB] Image 생성
     new_image = VisionImage(
         diary_id=diary_id, 
         file_name=os.path.basename(image_path), 
-        predicted_scene=scene_result
+        predicted_scene=scene_result,
+        scene_vector=json.dumps(scene_vector_list) 
     )
     db.add(new_image)
-    await db.flush() # ID를 발급받기 위해 비동기 flush 실행
+    await db.flush() 
 
     img_cv2 = cv2.imread(image_path)
     persons_data, objects_data = [], []
@@ -205,7 +230,7 @@ async def process_vision_analysis(diary_id: int, image_path: str, db: AsyncSessi
                     "center": calculate_center(box.xyxy[0].tolist())
                 })
 
-    # 3. DeepFace: 인물 식별
+    # 3. DeepFace: 인물 식별 및 감정 분석
     person_db_list = []
     target_child_found = False
     temp_persons = []
@@ -216,42 +241,51 @@ async def process_vision_analysis(diary_id: int, image_path: str, db: AsyncSessi
         x2, y2 = min(img_cv2.shape[1], int(box[2])), min(img_cv2.shape[0], int(box[3]))
         person_crop = img_cv2[y1:y2, x1:x2]
         
-        is_child, emotion_str = False, "Unknown"
+        is_child, emotion_str, emotion_score = False, "Unknown", 0.0
         
-        if person_crop.size > 0:
-            # 1. 누구든 일단 감정부터 읽어봅니다.
+        if person_crop.size > 0 and os.path.exists(REF_CHILD_IMG):
             try:
-                res_emo = DeepFace.analyze(img_path=person_crop, actions=['emotion'], enforce_detection=False, silent=True)
-                emotion_str = res_emo[0]['dominant_emotion']
-            except Exception as e:
-                # 🚨 여기서 에러가 찍히면 얼굴이 너무 작거나 가중치 파일이 없는 겁니다.
-                print(f"❌ Emotion Analysis Failed: {e}")
-                emotion_str = "Hidden"
-
-            # 2. 우리 아이인지 확인합니다.
-            if os.path.exists(REF_CHILD_IMG):
-                try:
-                    res_verify = DeepFace.verify(img1_path=person_crop, img2_path=REF_CHILD_IMG, enforce_detection=False, silent=True)
-                    if res_verify['verified']:
-                        is_child = True
-                except Exception as e:
-                    print(f"⚠️ Verification Failed: {e}")
+                res_verify = DeepFace.verify(img1_path=person_crop, img2_path=REF_CHILD_IMG, enforce_detection=False, silent=True)
+                # 🌟 AI가 얼굴을 얼마나 비슷하다고 느꼈는지 출력해 봅니다.
+                print(f"     🤖 [얼굴 인증] 매치 여부: {res_verify.get('verified')}, 거리(Distance): {res_verify.get('distance'):.3f}")
+                
+                if res_verify['verified']:
+                    is_child = True
+                    res_emo = DeepFace.analyze(img_path=person_crop, actions=['emotion'], enforce_detection=False, silent=True)
+                    emotion_str = res_emo[0]['dominant_emotion']
+                    emotion_score = res_emo[0]['emotion'][emotion_str]
+                    
+                    if res_verify['distance'] < 0.25:
+                        current_ym = datetime.date.today().strftime("%Y-%m")
+                        new_ref_path = os.path.join(BASE_DIR, f"media/images/ref_{current_ym}.jpg")
+                        if not os.path.exists(new_ref_path):
+                            cv2.imwrite(new_ref_path, person_crop)
+                            
+            except Exception as e: 
+                # 🌟 에러가 났다면 무슨 에러인지 출력합니다.
+                print(f"     🚨 [DeepFace 에러 발생] {str(e)}")
+        elif not os.path.exists(REF_CHILD_IMG):
+            print("     🚨 [경고] 기준 사진(my_child_ref.jpg)을 찾을 수 없습니다!") 
         
         if is_child: target_child_found = True
-        temp_persons.append({"p_data": p_data, "box": box, "is_child": is_child, "emotion_str": emotion_str})
+        temp_persons.append({"p_data": p_data, "box": box, "is_child": is_child, "emotion_str": emotion_str, "emotion_score": emotion_score})
         
     for tp in temp_persons:
-        # 3. 역할 배정 로직 (감정을 강제로 덮어쓰지 않도록 수정)
         if tp["is_child"]: 
             role_name = "Target_Child"
         elif not target_child_found: 
-            role_name = "Assumed_Child" 
+            role_name, tp["emotion_str"] = "Assumed_Child", "Hidden"
+            tp["emotion_score"] = 0.0 
         else: 
             role_name = "Adult_Helper"
-            tp["emotion_str"] = "Neutral" # 어른은 통계 방지용
+            tp["emotion_score"] = 0.0 
                 
         # [DB] Person & Appearance 저장
-        new_person = VisionPerson(role=role_name, emotion=tp["emotion_str"])
+        new_person = VisionPerson(
+            role=role_name, 
+            emotion=tp["emotion_str"],
+            emotion_score=tp.get("emotion_score", 0.0) 
+        )
         db.add(new_person)
         await db.flush()
         
@@ -269,7 +303,6 @@ async def process_vision_analysis(diary_id: int, image_path: str, db: AsyncSessi
         current_vector = get_siglip_embedding(processor_siglip, model_siglip, img_pil, o_data['box'])
         matched_instance_id, max_sim = None, 0.0
         
-        # [DB 비동기 조회] 같은 카테고리의 기존 사물 찾기
         result = await db.execute(select(VisionObjectInstance).filter_by(base_category=o_data['name']))
         existing_objects = result.scalars().all()
         
@@ -277,12 +310,11 @@ async def process_vision_analysis(diary_id: int, image_path: str, db: AsyncSessi
             stored_vector = torch.tensor(json.loads(ext_obj.feature_vector))
             sim = calculate_cosine_similarity(current_vector, stored_vector)
             if sim > max_sim:
-                max_sim, matched_instance_id = sim, ext_obj.id # 주의: model.py에서 id로 변경됨
+                max_sim, matched_instance_id = sim, ext_obj.id
         
         if max_sim > 0.75: 
             final_instance_id = matched_instance_id
         else:
-            # [DB] 새 Object Instance 저장
             new_obj = VisionObjectInstance(
                 feature_vector=json.dumps(current_vector.tolist()), 
                 base_category=o_data['name'], 
@@ -292,7 +324,6 @@ async def process_vision_analysis(diary_id: int, image_path: str, db: AsyncSessi
             await db.flush()
             final_instance_id = new_obj.id
 
-        # [DB] 사물 위치(Appearance) 저장
         db.add(VisionAppearance(
             image_id=new_image.id, 
             entity_type='Object', 
@@ -315,7 +346,6 @@ async def process_vision_analysis(diary_id: int, image_path: str, db: AsyncSessi
                         is_holding = True
             
             if is_holding: 
-                # [DB] 상호작용 저장
                 db.add(VisionInteraction(
                     image_id=new_image.id, 
                     person_id=p_data['db_id'], 
@@ -324,7 +354,6 @@ async def process_vision_analysis(diary_id: int, image_path: str, db: AsyncSessi
                     proximity_score=0.0
                 ))
 
-    # 에러가 나지 않았다면 모든 DB 변경사항을 확정(commit)
     await db.commit()
     
     return {

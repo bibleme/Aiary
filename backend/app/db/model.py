@@ -110,6 +110,10 @@ class VisionImage(Base):
     
     file_name = Column(String, nullable=False)
     predicted_scene = Column(String)  # Indoor / Outdoor
+    
+    # 🌟 추가됨: 리포트의 장소 클러스터링을 위한 CLIP 임베딩 벡터 저장 (JSON 텍스트)
+    scene_vector = Column(Text, nullable=True) 
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 관계 설정 (Diary 쪽에도 vision_image = relationship(...) 추가 필요)
@@ -126,6 +130,9 @@ class VisionPerson(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     role = Column(String, nullable=False)  # Target_Child, Adult_Helper 등
     emotion = Column(String)               # happy, sad 등
+    
+    # 🌟 추가됨: 리포트의 베스트 컷(신뢰도 높은 사진) 추출을 위한 감정 확률 점수
+    emotion_score = Column(Float, nullable=True) 
 
     interactions = relationship("VisionInteraction", back_populates="person", cascade="all, delete-orphan")
 
