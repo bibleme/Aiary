@@ -88,4 +88,34 @@ interface ApiService {
     suspend fun deleteAccount(
         @Header("Authorization") token: String
     ): Response<DeleteAccountResponse>
+
+    @GET("monthly-report/status")
+    suspend fun getMonthlyReportStatus(
+        @Query("target_month") targetMonth: String,
+        @Header("Authorization") token: String
+    ): Response<MonthlyReportStatusResponse>
+
+    // 월간 리포트 조회
+    @GET("monthly-report")
+    suspend fun getMonthlyReport(
+        @Query("target_month") targetMonth: String,
+        @Header("Authorization") token: String
+    ): Response<MonthlyReportResponse>
+
+    // 월간 리포트 생성
+    @POST("monthly-report/generate")
+    suspend fun generateMonthlyReport(
+        @Query("target_month") targetMonth: String,
+        @Header("Authorization") token: String
+    ): Response<MonthlyReportResponse>
+
+    // 월간 리포트 재생성
+    @POST("monthly-report/regenerate")
+    suspend fun regenerateMonthlyReport(
+        @Query("target_month") targetMonth: String,
+        @Header("Authorization") token: String
+    ): Response<MonthlyReportResponse>
+
+
 }
+
