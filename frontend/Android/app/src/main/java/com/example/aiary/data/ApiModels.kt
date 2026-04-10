@@ -92,3 +92,60 @@ data class DeleteAccountResponse(
     val relogin_required: Boolean,
     val error_code: String
 )
+
+data class MonthlyReportResponse(
+    val user_id: Int,
+    val month: String,
+    val mode: String?,
+    val month_overview: String,
+    val pattern_summary: String,
+    val change_summary: String,
+    val parent_note: String,
+    val one_line_summary: String,
+    val keyword_annotations: Map<String, List<KeywordAnnotation>>?,
+    val keyword_photo_index: Map<String, KeywordInfo>?,
+    val photo_library: List<PhotoInfo>?,
+    val generated_at: String?
+)
+
+// 상태 확인 API의 응답 데이터 클래스
+data class MonthlyReportStatusResponse(
+    val user_id: Int,
+    val month: String,
+    val exists: Boolean,
+    val is_up_to_date: Boolean,
+    val source_diary_count: Int,
+    val stored_source_diary_count: Int?,
+    val generated_at: String?,
+    val updated_at: String?,
+    val reason: String?
+)
+
+// 에러 처리용 (일기 5개 미만 등)
+data class ErrorResponse(
+    val detail: String
+)
+
+data class KeywordAnnotation(
+    val start: Int,
+    val end: Int,
+    val keyword: String,
+    val keyword_type: String,
+    val photo_count: Int,
+    val photos: List<PhotoInfo>
+)
+
+data class KeywordInfo(
+    val keyword: String,
+    val keyword_type: String,
+    val photo_count: Int,
+    val photos: List<PhotoInfo>
+)
+
+data class PhotoInfo(
+    val diary_id: Int,
+    val date: String,
+    val image_url: String,
+    val full_image_url: String,
+    val content: String
+)
