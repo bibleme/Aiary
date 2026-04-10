@@ -30,8 +30,6 @@ import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
-import com.example.aiary.data.StoryBookData
-import com.example.aiary.data.StoryEvent
 import com.example.aiary.data.UserSession
 import com.example.aiary.network.RetrofitClient
 import java.io.File
@@ -70,6 +68,7 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
     var selectedItem by remember { mutableIntStateOf(0) }
     val items = listOf("홈", "카드형", "리포트", "마이페이지")
     val icons = listOf(Icons.Filled.Home, Icons.Filled.List, Icons.Filled.DateRange, Icons.Filled.Person)
+
     var sharedBabyName by remember {
         mutableStateOf(sharedPreferences.getString("baby_name_$myId", "@@") ?: "@@")
     }
@@ -185,84 +184,35 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                     }
                 }
                 2 -> {
-                    var reportList by remember { mutableStateOf<List<StoryBookData>>(emptyList()) }
-                    var selectedReport by remember { mutableStateOf<StoryBookData?>(null) }
-
-                    // 각 월(Month)별 전체 사진들을 저장해둘 공간 (표지 변경 기능에 쓰임)
-                    var monthPhotosMap by remember { mutableStateOf<Map<String, List<String>>>(emptyMap()) }
+                    // 타입이 단순한 String(월 이름) 리스트로 바뀝니다!
+                    var activeMonths by remember { mutableStateOf<List<String>>(emptyList()) }
+                    var selectedMonthStr by remember { mutableStateOf<String?>(null) }
 
                     LaunchedEffect(Unit) {
                         try {
                             val myId = UserSession.userId
-                            val bearerToken = "Bearer ${UserSession.accessToken}"
-                            val response = RetrofitClient.api.getDiaries(myId, bearerToken)
+                            val token = "Bearer ${UserSession.accessToken}"
+                            // 전체 일기 조회해서 일기가 있는 "YYYY-MM"만 쏙쏙 뽑아오기
+                            val response = RetrofitClient.api.getDiaries(myId, token)
                             if (response.isSuccessful) {
                                 val diaries = response.body() ?: emptyList()
-
-                                if (diaries.isNotEmpty()) {
-                                    // 서버에서 온 일기들을 "YYYY.MM" (예: 2025.12) 단위로 그룹화(묶기) 합니다.
-                                    val groupedDiaries = diaries.groupBy { diary ->
-                                        // date 대신 데이터 클래스에 있는 diary_date를 사용
-                                        // 만약 diary_date가 비어있을(null) 경우를 대비해 created_at을 예비용으로 쓰도록 안전장치(?:)도 걸어두었습니다.
-                                        val targetDate = diary.diary_date ?: diary.created_at
-
-                                        if (targetDate.length >= 7) {
-                                            targetDate.substring(0, 7).replace("-", ".")
-                                        } else {
-                                            "알 수 없음"
-                                        }
-                                    }
-
-                                    val tempReportList = mutableListOf<StoryBookData>()
-                                    val tempPhotosMap = mutableMapOf<String, List<String>>()
-
-                                    // 2. 묶여진 월별 일기들을 바탕으로 진짜 책(리포트)을 만듭니다.
-                                    for ((monthStr, monthDiaries) in groupedDiaries) {
-                                        // 해당 월의 모든 사진 주소 정리
-                                        val photoUrls = monthDiaries.map { diary ->
-                                            if (diary.image_url.startsWith("http")) diary.image_url
-                                            else "http://3.35.185.251:8000${diary.image_url}"
-                                        }
-                                        tempPhotosMap[monthStr] = photoUrls
-
-                                        // 해당 월의 이벤트 추출
-                                        val events = monthDiaries.take(3).map { diary ->
-                                            val fixedEventUrl = if (diary.image_url.startsWith("http"))
-                                                diary.image_url else "http://3.35.185.251:8000${diary.image_url}"
-                                            StoryEvent("기록", listOf(fixedEventUrl), diary.content)
-                                        }
-
-                                        // 리포트 1권 완성
-                                        tempReportList.add(
-                                            StoryBookData(
-                                                month = monthStr, // "2025.12" 등
-                                                mainPhotoUrl = photoUrls.last(), // 가장 최근 사진을 표지로
-                                                summary = "${monthStr}의 소중한 추억들입니다. " +
-                                                        "(총 ${monthDiaries.size}개의 기록)", // 임시 요약글
-                                                events = events
-                                            )
-                                        )
-                                    }
-
-                                    // 최신 달이 맨 앞에 오도록 정렬해서 저장
-                                    reportList = tempReportList.sortedByDescending { it.month }
-                                    monthPhotosMap = tempPhotosMap
-                                }
+                                activeMonths = diaries.mapNotNull { diary ->
+                                    val targetDate = diary.diary_date ?: diary.created_at
+                                    if (targetDate.length >= 7) targetDate.substring(0, 7) else null
+                                }.distinct().sortedDescending() // 중복 제거 후 최신순 정렬
                             }
                         } catch (e: Exception) { e.printStackTrace() }
                     }
 
-                    if (selectedReport == null) {
+                    if (selectedMonthStr == null) {
                         ReportListScreen(
-                            reports = reportList,
-                            onReportClick = { report -> selectedReport = report }
+                            months = activeMonths, // String 리스트 넘김
+                            onMonthClick = { monthStr -> selectedMonthStr = monthStr }
                         )
                     } else {
-                        BookStoryScreen(
-                            storyData = selectedReport!!,
-                            // 내가 선택한 달(month)의 사진들만 팝업에 넘겨줌!
-                            allMonthPhotoUrls = monthPhotosMap[selectedReport!!.month] ?: emptyList(),
-                            onBack = { selectedReport = null }
+                        ReportWrapperScreen(
+                            targetMonth = selectedMonthStr!!,
+                            onBack = { selectedMonthStr = null }
                         )
                     }
                 }
@@ -276,7 +226,6 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
                         onUpdateProfile = { newName, newDate ->
                             sharedBabyName = newName
                             sharedBabyBirthDate = newDate
-
                             sharedPreferences.edit()
                                 .putString("baby_name_$myId", newName)
                                 .putString("baby_birth_$myId", newDate)
@@ -312,8 +261,8 @@ fun HomeScreen(onNavigateToUpload: () -> Unit,
 
 @Composable
 fun ReportListScreen(
-    reports: List<StoryBookData>,
-    onReportClick: (StoryBookData) -> Unit
+    months: List<String>,
+    onMonthClick: (String) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -332,7 +281,7 @@ fun ReportListScreen(
                 .padding(bottom = 32.dp)
         )
 
-        if (reports.isEmpty()) {
+        if (months.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("아직 쌓인 추억이 없어요.", color = Color.Gray)
             }
@@ -342,8 +291,12 @@ fun ReportListScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(6.dp, Alignment.Bottom)
             ) {
-                itemsIndexed(reports) { index, report ->
-                    StackedBookItem(report = report, index = index, onClick = { onReportClick(report) })
+                itemsIndexed(months) { index, monthStr ->
+                    StackedBookItem(
+                        monthStr = monthStr,
+                        index = index,
+                        onClick = { onMonthClick(monthStr) }
+                    )
                 }
             }
         }
@@ -352,26 +305,25 @@ fun ReportListScreen(
 
 @Composable
 fun StackedBookItem(
-    report: StoryBookData,
+    monthStr: String,
     index: Int,
     onClick: () -> Unit
 ) {
     // 책등 색상 팔레트
     val bookColors = listOf(
-        Color(0xFFF2B8B5), 
-        Color(0xFFE6C2A5), 
-        Color(0xFFA8C8A6), 
+        Color(0xFFF2B8B5),
+        Color(0xFFE6C2A5),
+        Color(0xFFA8C8A6),
         Color(0xFFB5C0D0),
-        Color(0xFFD3B8D8)  
+        Color(0xFFD3B8D8)
     )
     val backgroundColor = bookColors[index % bookColors.size]
 
     // 가로 길이 (삐뚤빼뚤하게)
     val widthFraction = if (index % 2 == 0) 0.85f else 0.95f
 
-    // 책 두께(높이)를 다양하게 리스트로 만듭니다!
+    // 책 두께(높이)를 다양하게
     val bookHeights = listOf(45.dp, 65.dp, 50.dp, 75.dp, 55.dp)
-    // 인덱스에 맞춰서 두께를 하나씩 꺼내옵니다.
     val currentThickness = bookHeights[index % bookHeights.size]
 
     Card(
@@ -380,7 +332,6 @@ fun StackedBookItem(
         colors = CardDefaults.cardColors(containerColor = backgroundColor),
         modifier = Modifier
             .fillMaxWidth(widthFraction)
-            // 고정값 대신 위에서 만든 변수를 넣어줍니다
             .height(currentThickness)
             .clickable { onClick() }
     ) {
@@ -388,8 +339,10 @@ fun StackedBookItem(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center
         ) {
+            val displayMonth = monthStr.replace("-", ".")
+
             Text(
-                text = "${report.month}의 기록",
+                text = "${displayMonth}의 기록",
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 color = DarkGray
