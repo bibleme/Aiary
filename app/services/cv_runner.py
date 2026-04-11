@@ -1,4 +1,5 @@
 # app/services/cv_runner.py
+# app/services/cv_runner.py
 from __future__ import annotations
 
 import math
@@ -12,6 +13,8 @@ from PIL import Image
 from app.config import settings
 from app.db.model import Diary
 from app.services.cv_loader import load_cv_models
+
+USE_DEEPFACE = False
 
 
 def _resolve_local_image_path(image_url: str) -> Path:
@@ -240,9 +243,14 @@ async def run_cv_for_diary(diary: Diary) -> dict:
     predicted_tag, scene_vector = _classify_scene(models, img_pil)
 
     ref_paths = _get_user_child_refs(diary.user_id)
-    target_child_found, target_child_confidence = _verify_target_child(image_path, ref_paths)
 
-    persons = _analyze_faces(image_path, target_child_found)
+    if USE_DEEPFACE:
+        target_child_found, target_child_confidence = _verify_target_child(image_path, ref_paths)
+        persons = _analyze_faces(image_path, target_child_found)
+    else:
+        target_child_found, target_child_confidence = False, None
+        persons = []
+
     objects = _detect_objects(models, image_path, img_pil)
     interactions = _build_interactions(persons, objects)
 
