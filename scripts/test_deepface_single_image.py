@@ -1,7 +1,5 @@
 from pathlib import Path
 
-import os
-os.environ.setdefault("DEEPFACE_HOME", "home/ubuntu/aiary-assets/cv/cache/deepface")
 
 from app.db.model import Diary
 from app.services.cv_runner import resolve_local_image_path

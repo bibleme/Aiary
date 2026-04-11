@@ -1,13 +1,10 @@
 # app/services/cv_face_runner.py
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
 from app.config import settings
-
-os.environ.setdefault("DEEPFACE_HOME", settings.CV_CACHE_ROOT + "/deepface")
 
 
 def get_user_child_refs(user_id: int) -> list[Path]:
