@@ -20,18 +20,27 @@ def get_device():
     return torch.device("cpu")
 
 
-def _register_ultralytics_safe_globals() -> None:
+def _load_yolo_trusted(weights_path: str):
     """
-    PyTorch 2.6+에서 torch.load 기본값이 weights_only=True로 바뀌면서
-    Ultralytics YOLO 체크포인트 로딩 시 safe globals 등록이 필요할 수 있음.
+    PyTorch 2.6+에서 torch.load 기본 weights_only=True 때문에
+    Ultralytics YOLO 체크포인트 로딩이 막히는 문제를 피하기 위해,
+    신뢰 가능한 공식 weight 파일에 한해서만 weights_only=False로 강제한다.
     """
+    from ultralytics import YOLO
+
+    original_torch_load = torch.load
+
+    def patched_torch_load(*args, **kwargs):
+        kwargs["weights_only"] = False
+        return original_torch_load(*args, **kwargs)
+
+    torch.load = patched_torch_load
     try:
-        from ultralytics.nn.tasks import DetectionModel, PoseModel
-        torch.serialization.add_safe_globals([DetectionModel, PoseModel])
-    except Exception:
-        # 환경에 따라 내부 클래스 import가 달라질 수 있으므로,
-        # 여기서 실패해도 아래 YOLO 로드 시도는 계속 진행한다.
-        pass
+        model = YOLO(weights_path)
+    finally:
+        torch.load = original_torch_load
+
+    return model
 
 
 def load_cv_models() -> dict[str, Any]:
@@ -43,17 +52,14 @@ def load_cv_models() -> dict[str, Any]:
     os.environ.setdefault("TORCH_HOME", str(Path(settings.CV_CACHE_ROOT) / "torch"))
     os.environ.setdefault("DEEPFACE_HOME", str(Path(settings.CV_CACHE_ROOT) / "deepface"))
 
-    _register_ultralytics_safe_globals()
-
-    from ultralytics import YOLO
     import clip
     from transformers import AutoProcessor, AutoModel
 
     device = get_device()
 
-    # YOLO weights 로드
-    yolo_obj = YOLO(settings.CV_YOLO_OBJECT_MODEL)
-    yolo_pose = YOLO(settings.CV_YOLO_POSE_MODEL)
+    # YOLO 공식 weight 파일 로드
+    yolo_obj = _load_yolo_trusted(settings.CV_YOLO_OBJECT_MODEL)
+    yolo_pose = _load_yolo_trusted(settings.CV_YOLO_POSE_MODEL)
 
     # CLIP 로드
     clip_model, clip_preprocess = clip.load(settings.CV_CLIP_MODEL_NAME, device=device)
