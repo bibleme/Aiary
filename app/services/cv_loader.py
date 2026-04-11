@@ -20,6 +20,20 @@ def get_device():
     return torch.device("cpu")
 
 
+def _register_ultralytics_safe_globals() -> None:
+    """
+    PyTorch 2.6+에서 torch.load 기본값이 weights_only=True로 바뀌면서
+    Ultralytics YOLO 체크포인트 로딩 시 safe globals 등록이 필요할 수 있음.
+    """
+    try:
+        from ultralytics.nn.tasks import DetectionModel, PoseModel
+        torch.serialization.add_safe_globals([DetectionModel, PoseModel])
+    except Exception:
+        # 환경에 따라 내부 클래스 import가 달라질 수 있으므로,
+        # 여기서 실패해도 아래 YOLO 로드 시도는 계속 진행한다.
+        pass
+
+
 def load_cv_models() -> dict[str, Any]:
     global _MODELS
     if _MODELS is not None:
@@ -29,17 +43,22 @@ def load_cv_models() -> dict[str, Any]:
     os.environ.setdefault("TORCH_HOME", str(Path(settings.CV_CACHE_ROOT) / "torch"))
     os.environ.setdefault("DEEPFACE_HOME", str(Path(settings.CV_CACHE_ROOT) / "deepface"))
 
+    _register_ultralytics_safe_globals()
+
     from ultralytics import YOLO
     import clip
     from transformers import AutoProcessor, AutoModel
 
     device = get_device()
 
+    # YOLO weights 로드
     yolo_obj = YOLO(settings.CV_YOLO_OBJECT_MODEL)
     yolo_pose = YOLO(settings.CV_YOLO_POSE_MODEL)
 
+    # CLIP 로드
     clip_model, clip_preprocess = clip.load(settings.CV_CLIP_MODEL_NAME, device=device)
 
+    # SigLIP 로드
     siglip_processor = AutoProcessor.from_pretrained(settings.CV_SIGLIP_MODEL_NAME)
     siglip_model = AutoModel.from_pretrained(settings.CV_SIGLIP_MODEL_NAME).to(device)
 
@@ -60,6 +79,7 @@ def load_cv_models() -> dict[str, Any]:
         "a blurry photo or texture without a visible background",
         "a photo of a plain floor, wall, or ceiling",
     ]
+
     prompt_to_tag = {
         prompts[0]: "Routine_Indoor",
         prompts[1]: "Routine_Indoor",
