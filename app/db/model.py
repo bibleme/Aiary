@@ -144,10 +144,10 @@ class VisionImage(Base):
     image_url = Column(String, nullable=False)
     year_month = Column(String(7), nullable=False, index=True)
 
-    cv_status = Column(String(20), nullable=False, default="pending", index=True)  # pending / done / failed
+    cv_status = Column(String(20), nullable=False, default="pending", index=True)
     error_message = Column(Text, nullable=True)
 
-    predicted_tag = Column(String, nullable=True)   # Routine_Indoor / Special_Outing / Outdoor_Outing / No_Scene
+    predicted_tag = Column(String, nullable=True)
     scene_vector = Column(JSON, nullable=True)
 
     target_child_found = Column(Boolean, nullable=False, default=False)
@@ -171,18 +171,22 @@ class VisionImage(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+
     object_instances = relationship(
         "VisionObjectInstance",
         back_populates="vision_image",
         cascade="all, delete-orphan",
         passive_deletes=True,
+        foreign_keys="VisionObjectInstance.vision_image_id",
     )
+
     appearances = relationship(
         "VisionAppearance",
         back_populates="vision_image",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+
     interactions = relationship(
         "VisionInteraction",
         back_populates="vision_image",
@@ -212,12 +216,23 @@ class VisionObjectInstance(Base):
     __tablename__ = "vision_object_instances"
 
     id = Column(Integer, primary_key=True, index=True)
-    vision_image_id = Column(Integer, ForeignKey("vision_images.id", ondelete="CASCADE"), nullable=False, index=True)
+    vision_image_id = Column(
+        Integer,
+        ForeignKey("vision_images.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
     base_category = Column(String, nullable=False, index=True)
     feature_vector = Column(JSON, nullable=True)
     parent_assigned_name = Column(String, nullable=True)
-    first_seen_vision_image_id = Column(Integer, ForeignKey("vision_images.id"), nullable=True)
+
+    first_seen_vision_image_id = Column(
+        Integer,
+        ForeignKey("vision_images.id"),
+        nullable=True,
+    )
+
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
     vision_image = relationship(
@@ -226,6 +241,10 @@ class VisionObjectInstance(Base):
         foreign_keys=[vision_image_id],
     )
 
+    first_seen_vision_image = relationship(
+        "VisionImage",
+        foreign_keys=[first_seen_vision_image_id],
+    )
 
 class VisionAppearance(Base):
     __tablename__ = "vision_appearances"
