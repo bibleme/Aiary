@@ -1,0 +1,101 @@
+# app/schemas/cv.py
+from datetime import datetime
+from typing import List, Optional, Literal
+from pydantic import BaseModel, Field
+
+
+class AppearanceBBox(BaseModel):
+    file_name: str
+    bbox: list[float]
+
+
+class FavoriteObjectItem(BaseModel):
+    rank: int
+    category: str
+    is_new: bool
+    photo_count: int
+    appearances: List[AppearanceBBox]
+
+
+class BestCut(BaseModel):
+    file_name: str
+    confidence: float
+    bbox: list[float]
+
+
+class EmotionSummaryItem(BaseModel):
+    emotion_en: str
+    emotion_kr: str
+    ratio: float
+    best_cut: BestCut
+
+
+class HighlightPlaceItem(BaseModel):
+    rank: int
+    is_new: bool
+    photo_count: int
+    photos: List[str]
+
+
+class CVMonthlySummaryResponse(BaseModel):
+    report_month: str
+    favorite_objects: List[FavoriteObjectItem] = Field(default_factory=list)
+    emotions_summary: List[EmotionSummaryItem] = Field(default_factory=list)
+    highlight_places: List[HighlightPlaceItem] = Field(default_factory=list)
+
+
+class CVStatusResponse(BaseModel):
+    one_line_diary_id: int
+    cv_status: Literal["pending", "done", "failed"]
+    predicted_tag: Optional[str] = None
+    target_child_found: bool = False
+    processed_at: Optional[datetime] = None
+    error_message: Optional[str] = None
+
+
+class CVProcessResponse(BaseModel):
+    one_line_diary_id: int
+    vision_image_id: int
+    cv_status: Literal["pending", "done", "failed"]
+    message: str
+
+
+class AppearanceIn(BaseModel):
+    entity_type: Literal["person", "object"]
+    entity_index: int
+    bbox: list[float]
+    confidence: Optional[float] = None
+
+
+class PersonIn(BaseModel):
+    role: str
+    emotion: Optional[str] = None
+    emotion_score: Optional[float] = None
+    bbox: Optional[list[float]] = None
+    face_confidence: Optional[float] = None
+
+
+class ObjectIn(BaseModel):
+    base_category: str
+    feature_vector: Optional[list[float]] = None
+    parent_assigned_name: Optional[str] = None
+    first_seen_vision_image_id: Optional[int] = None
+    bbox: Optional[list[float]] = None
+    confidence: Optional[float] = None
+
+
+class InteractionIn(BaseModel):
+    person_index: int
+    object_index: int
+    interaction_type: Optional[str] = None
+    proximity_score: Optional[float] = None
+
+
+class CVIngestRequest(BaseModel):
+    predicted_tag: Optional[str] = None
+    scene_vector: Optional[list[float]] = None
+    target_child_found: bool = False
+    target_child_confidence: Optional[float] = None
+    persons: List[PersonIn] = Field(default_factory=list)
+    objects: List[ObjectIn] = Field(default_factory=list)
+    interactions: List[InteractionIn] = Field(default_factory=list)

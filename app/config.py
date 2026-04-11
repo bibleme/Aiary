@@ -28,10 +28,39 @@ class Settings(BaseSettings):
 
     MONTHLY_REPORT_USE_JSON_FALLBACK: bool = True
 
-    MONTHLY_REPORT_USE_GPT_SCENE: bool = False
-    MONTHLY_REPORT_USE_GPT_REPORT: bool = False
+    MONTHLY_REPORT_USE_GPT_SCENE: bool = True
+    MONTHLY_REPORT_USE_GPT_REPORT: bool = True
     MONTHLY_REPORT_OPENAI_MODEL: str = "gpt-4.1-mini"
     MONTHLY_REPORT_SCENE_OPENAI_MODEL: str = "gpt-4.1-mini"
+    
+     # =========================
+    # CV settings
+    # =========================
+    
+    CV_ENABLED: bool = True
+    CV_MODELS_ROOT: str = "/home/ubuntu/aiary-assets/cv/models"
+    CV_CHILD_REFS_ROOT: str = "/home/ubuntu/aiary-assets/cv/child_refs"
+    CV_CACHE_ROOT: str = "/home/ubuntu/aiary-assets/cv/cache"
+    CV_LOG_ROOT: str = "/home/ubuntu/aiary-assets/cv/logs"
+    CV_DEBUG_ROOT: str = "/home/ubuntu/aiary-assets/cv/debug"
+    CV_TEMP_ROOT: str = "/home/ubuntu/aiary-assets/cv/temp"
+
+    CV_YOLO_OBJECT_MODEL: str = "/home/ubuntu/aiary-assets/cv/models/yolo26m.pt"
+    CV_YOLO_POSE_MODEL: str = "/home/ubuntu/aiary-assets/cv/models/yolo26m-pose.pt"
+
+    CV_CLIP_MODEL_NAME: str = "ViT-B/32"
+    CV_SIGLIP_MODEL_NAME: str = "google/siglip-base-patch16-224"
+
+    CV_SIMILARITY_THRESHOLD: float = 0.75
+    CV_SCENE_CLUSTER_THRESHOLD: float = 0.88
+    CV_TARGET_CHILD_VERIFY_THRESHOLD: float = 0.35
+    CV_BATCH_LIMIT: int = 20
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        extra="ignore",
+    )
+
 
 
 settings = Settings()

@@ -14,7 +14,6 @@ from sqlalchemy import (
     Float,
     Boolean,
 )
-
 from sqlalchemy.orm import relationship, declarative_base
 
 Base = declarative_base()
@@ -27,8 +26,6 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
-
-    # 비밀번호 변경 후 기존 토큰 무효화용
     token_version = Column(Integer, nullable=False, default=0)
 
     diaries = relationship(
@@ -37,18 +34,20 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
-
-    # 하루일기 테이블 추가
     daily_diaries = relationship(
         "DailyDiary",
         back_populates="owner",
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
-    
-    # 월별 리포트 테이블
     monthly_reports = relationship(
         "MonthlyReport",
+        back_populates="owner",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    vision_images = relationship(
+        "VisionImage",
         back_populates="owner",
         cascade="all, delete-orphan",
         passive_deletes=True,
@@ -59,49 +58,37 @@ class Diary(Base):
     __tablename__ = "one_line_diaries"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(
-        Integer,
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     content = Column(Text, nullable=False)
     image_url = Column(String, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False, index=True)
-
-    # 한줄일기 생성 날짜 저장
     diary_date = Column(Date, nullable=False, default=datetime.date.today, index=True)
 
     owner = relationship("User", back_populates="diaries")
+    vision_image = relationship(
+        "VisionImage",
+        back_populates="diary",
+        uselist=False,
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 
 class DailyDiary(Base):
     __tablename__ = "daily_diaries"
     __table_args__ = (
-        # 유저별 같은 날짜 하루일기 1개만 허용
         UniqueConstraint("user_id", "diary_date", name="uq_daily_diaries_user_date"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(
-        Integer,
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     diary_date = Column(Date, nullable=False, index=True)
 
-    # 기존 컬럼: 바로 삭제하지 않고 호환용으로 잠시 유지
     content = Column(Text, nullable=True)
-
-    # 새 구조
     generated_content = Column(Text, nullable=True)
     edited_content = Column(Text, nullable=True)
-
     model_version = Column(String, nullable=True)
     generation_meta = Column(JSON, nullable=True)
-
-    # 하루일기 생성 시 사용한 한줄일기 개수
     source_count = Column(Integer, nullable=False, default=0)
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
@@ -112,12 +99,10 @@ class DailyDiary(Base):
         nullable=False,
     )
     edited_at = Column(DateTime(timezone=True), nullable=True)
-    
-    owner = relationship("User", back_populates="daily_diaries")
-    
-    
 
-    
+    owner = relationship("User", back_populates="daily_diaries")
+
+
 class MonthlyReport(Base):
     __tablename__ = "monthly_reports"
     __table_args__ = (
@@ -125,24 +110,13 @@ class MonthlyReport(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(
-        Integer,
-        ForeignKey("users.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
-
-    # 예: "2026-03"
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     target_month = Column(String(7), nullable=False, index=True)
-
-    # 최종 리포트 전체 JSON
     report_json = Column(JSON, nullable=False)
 
-    # 최신 여부 판단용
     source_diary_count = Column(Integer, nullable=False, default=0)
     source_hash = Column(String(64), nullable=False, default="")
     generation_version = Column(String, nullable=True)
-
     last_source_created_at = Column(DateTime, nullable=True)
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
@@ -154,3 +128,133 @@ class MonthlyReport(Base):
     )
 
     owner = relationship("User", back_populates="monthly_reports")
+
+
+class VisionImage(Base):
+    __tablename__ = "vision_images"
+    __table_args__ = (
+        UniqueConstraint("one_line_diary_id", name="uq_vision_images_diary"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    one_line_diary_id = Column(Integer, ForeignKey("one_line_diaries.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    file_name = Column(String, nullable=False)
+    image_url = Column(String, nullable=False)
+    year_month = Column(String(7), nullable=False, index=True)
+
+    cv_status = Column(String(20), nullable=False, default="pending", index=True)  # pending / done / failed
+    error_message = Column(Text, nullable=True)
+
+    predicted_tag = Column(String, nullable=True)   # Routine_Indoor / Special_Outing / Outdoor_Outing / No_Scene
+    scene_vector = Column(JSON, nullable=True)
+
+    target_child_found = Column(Boolean, nullable=False, default=False)
+    target_child_confidence = Column(Float, nullable=True)
+
+    processed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    updated_at = Column(
+        DateTime,
+        default=datetime.datetime.utcnow,
+        onupdate=datetime.datetime.utcnow,
+        nullable=False,
+    )
+
+    owner = relationship("User", back_populates="vision_images")
+    diary = relationship("Diary", back_populates="vision_image")
+
+    persons = relationship(
+        "VisionPerson",
+        back_populates="vision_image",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    object_instances = relationship(
+        "VisionObjectInstance",
+        back_populates="vision_image",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    appearances = relationship(
+        "VisionAppearance",
+        back_populates="vision_image",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    interactions = relationship(
+        "VisionInteraction",
+        back_populates="vision_image",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+
+
+class VisionPerson(Base):
+    __tablename__ = "vision_persons"
+
+    id = Column(Integer, primary_key=True, index=True)
+    vision_image_id = Column(Integer, ForeignKey("vision_images.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    role = Column(String, nullable=False)  # target_child / adult_helper / assumed_child / other
+    emotion = Column(String, nullable=True)
+    emotion_score = Column(Float, nullable=True)
+    bbox = Column(JSON, nullable=True)
+    face_confidence = Column(Float, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+    vision_image = relationship("VisionImage", back_populates="persons")
+
+
+class VisionObjectInstance(Base):
+    __tablename__ = "vision_object_instances"
+
+    id = Column(Integer, primary_key=True, index=True)
+    vision_image_id = Column(Integer, ForeignKey("vision_images.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    base_category = Column(String, nullable=False, index=True)
+    feature_vector = Column(JSON, nullable=True)
+    parent_assigned_name = Column(String, nullable=True)
+    first_seen_vision_image_id = Column(Integer, ForeignKey("vision_images.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+    vision_image = relationship(
+        "VisionImage",
+        back_populates="object_instances",
+        foreign_keys=[vision_image_id],
+    )
+
+
+class VisionAppearance(Base):
+    __tablename__ = "vision_appearances"
+
+    id = Column(Integer, primary_key=True, index=True)
+    vision_image_id = Column(Integer, ForeignKey("vision_images.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    entity_type = Column(String, nullable=False)  # person / object
+    entity_id = Column(Integer, nullable=False)
+    bbox = Column(JSON, nullable=True)
+    confidence = Column(Float, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+    vision_image = relationship("VisionImage", back_populates="appearances")
+
+
+class VisionInteraction(Base):
+    __tablename__ = "vision_interactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    vision_image_id = Column(Integer, ForeignKey("vision_images.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    person_id = Column(Integer, ForeignKey("vision_persons.id", ondelete="CASCADE"), nullable=False, index=True)
+    object_instance_id = Column(Integer, ForeignKey("vision_object_instances.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    interaction_type = Column(String, nullable=True)
+    proximity_score = Column(Float, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+
+    vision_image = relationship("VisionImage", back_populates="interactions")
