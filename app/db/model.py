@@ -137,8 +137,18 @@ class VisionImage(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    one_line_diary_id = Column(Integer, ForeignKey("one_line_diaries.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    one_line_diary_id = Column(
+        Integer,
+        ForeignKey("one_line_diaries.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
     file_name = Column(String, nullable=False)
     image_url = Column(String, nullable=False)
@@ -199,9 +209,14 @@ class VisionPerson(Base):
     __tablename__ = "vision_persons"
 
     id = Column(Integer, primary_key=True, index=True)
-    vision_image_id = Column(Integer, ForeignKey("vision_images.id", ondelete="CASCADE"), nullable=False, index=True)
+    vision_image_id = Column(
+        Integer,
+        ForeignKey("vision_images.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
-    role = Column(String, nullable=False)  # target_child / adult_helper / assumed_child / other
+    role = Column(String, nullable=False)
     emotion = Column(String, nullable=True)
     emotion_score = Column(Float, nullable=True)
     bbox = Column(JSON, nullable=True)
@@ -216,6 +231,7 @@ class VisionObjectInstance(Base):
     __tablename__ = "vision_object_instances"
 
     id = Column(Integer, primary_key=True, index=True)
+
     vision_image_id = Column(
         Integer,
         ForeignKey("vision_images.id", ondelete="CASCADE"),
@@ -246,11 +262,17 @@ class VisionObjectInstance(Base):
         foreign_keys=[first_seen_vision_image_id],
     )
 
+
 class VisionAppearance(Base):
     __tablename__ = "vision_appearances"
 
     id = Column(Integer, primary_key=True, index=True)
-    vision_image_id = Column(Integer, ForeignKey("vision_images.id", ondelete="CASCADE"), nullable=False, index=True)
+    vision_image_id = Column(
+        Integer,
+        ForeignKey("vision_images.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
     entity_type = Column(String, nullable=False)  # person / object
     entity_id = Column(Integer, nullable=False)
@@ -266,10 +288,25 @@ class VisionInteraction(Base):
     __tablename__ = "vision_interactions"
 
     id = Column(Integer, primary_key=True, index=True)
-    vision_image_id = Column(Integer, ForeignKey("vision_images.id", ondelete="CASCADE"), nullable=False, index=True)
+    vision_image_id = Column(
+        Integer,
+        ForeignKey("vision_images.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
-    person_id = Column(Integer, ForeignKey("vision_persons.id", ondelete="CASCADE"), nullable=False, index=True)
-    object_instance_id = Column(Integer, ForeignKey("vision_object_instances.id", ondelete="CASCADE"), nullable=False, index=True)
+    person_id = Column(
+        Integer,
+        ForeignKey("vision_persons.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    object_instance_id = Column(
+        Integer,
+        ForeignKey("vision_object_instances.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
 
     interaction_type = Column(String, nullable=True)
     proximity_score = Column(Float, nullable=True)
