@@ -233,3 +233,70 @@ async def get_pending_vision_images(db: AsyncSession, limit: int = 20) -> list[V
         .limit(limit)
     )
     return list(result.scalars().all())
+
+
+async def save_face_cv_result(
+    db: AsyncSession,
+    vision_image: VisionImage,
+    target_child_found: bool,
+    target_child_confidence: Optional[float],
+    persons: list[dict],
+) -> VisionImage:
+    # 기존 person / interaction / person appearance만 정리
+    existing_person_rows = await db.execute(
+        select(VisionPerson).where(VisionPerson.vision_image_id == vision_image.id)
+    )
+    existing_persons = list(existing_person_rows.scalars().all())
+    existing_person_ids = [p.id for p in existing_persons]
+
+    if existing_person_ids:
+        await db.execute(
+            delete(VisionInteraction).where(VisionInteraction.person_id.in_(existing_person_ids))
+        )
+        await db.execute(
+            delete(VisionAppearance)
+            .where(VisionAppearance.entity_type == "person")
+            .where(VisionAppearance.entity_id.in_(existing_person_ids))
+        )
+
+    await db.execute(
+        delete(VisionPerson).where(VisionPerson.vision_image_id == vision_image.id)
+    )
+    await db.commit()
+
+    vision_image.target_child_found = target_child_found
+    vision_image.target_child_confidence = target_child_confidence
+    db.add(vision_image)
+    await db.flush()
+
+    person_rows: list[VisionPerson] = []
+    for p in persons:
+        row = VisionPerson(
+            vision_image_id=vision_image.id,
+            role=p.get("role", "other"),
+            emotion=p.get("emotion"),
+            emotion_score=p.get("emotion_score"),
+            bbox=p.get("bbox"),
+            face_confidence=p.get("face_confidence"),
+        )
+        db.add(row)
+        person_rows.append(row)
+
+    await db.flush()
+
+    for idx, p in enumerate(persons):
+        bbox = p.get("bbox")
+        if bbox:
+            db.add(
+                VisionAppearance(
+                    vision_image_id=vision_image.id,
+                    entity_type="person",
+                    entity_id=person_rows[idx].id,
+                    bbox=bbox,
+                    confidence=p.get("face_confidence"),
+                )
+            )
+
+    await db.commit()
+    await db.refresh(vision_image)
+    return vision_image
