@@ -18,11 +18,18 @@ from app.services.cv_face_runner import (
 )
 
 
+# 임시 수동 제외 대상 diary_id 목록
+# 목적:
+# - 특정 문제 이미지 때문에 전체 월 후처리가 중단되지 않게 하기 위함
+# - 원본 데이터는 유지하고, face 후처리 대상에서만 제외
+# - 나중에 개별 디버깅 후 다시 복구 가능
+MANUAL_SKIP_DIARY_IDS = {852}
+
+
 def parse_month_range(target_month: str):
     """
-    YYYY-MM 형식의 문자열을 받아
-    해당 월의 시작일(start)과 다음 달 시작일(end)을 반환한다.
-    예: 2026-05 -> 2026-05-01 ~ 2026-06-01
+    YYYY-MM 형식 문자열을 해당 월의 [start, end) 범위 date로 변환한다.
+    예: 2026-01 -> 2026-01-01 ~ 2026-02-01
     """
     start = datetime.strptime(target_month + "-01", "%Y-%m-%d").date()
     if start.month == 12:
@@ -36,7 +43,6 @@ async def has_face_result(db, vision_image_id: int) -> bool:
     """
     해당 vision_image_id에 이미 face 후처리 결과(VisionPerson)가 있는지 확인한다.
     있으면 True, 없으면 False.
-    cron이나 재실행 시 이미 처리한 항목을 자동 skip하기 위해 사용한다.
     """
     result = await db.execute(
         select(VisionPerson.id).where(VisionPerson.vision_image_id == vision_image_id).limit(1)
@@ -49,9 +55,9 @@ async def process_one_diary(db, diary: Diary):
     diary 하나에 대해 face 후처리를 수행한다.
 
     처리 흐름:
-    1. 연결된 vision_image가 있는지 확인
+    1. 연결된 vision_image 존재 여부 확인
     2. 이미 face 결과가 있으면 skip
-    3. 이미지 파일이 실제로 존재하는지 확인
+    3. 이미지 파일 존재 여부 확인
     4. child refs 로드
     5. target child verify
     6. emotion analyze
@@ -93,7 +99,6 @@ async def process_one_diary(db, diary: Diary):
         f"person_count={len(persons)}"
     )
 
-    # 큰 객체 참조 정리 + 가비지 컬렉션 힌트
     del persons
     gc.collect()
 
@@ -104,11 +109,11 @@ async def process_month(user_id: int, target_month: str, batch_size: int, sleep_
     """
     특정 유저(user_id)의 특정 월(target_month)에 해당하는 diary들을 순차 처리한다.
 
-    핵심 안정화 포인트:
-    - batch_size: 몇 개 처리할 때마다 잠깐 쉬는지
+    안정화 포인트:
+    - batch_size: 몇 개 신규 처리할 때마다 쉬는지
     - sleep_seconds: 배치 사이 쉬는 시간
-    - max_new_per_run: 한 번의 스크립트 실행에서 '신규 처리' 최대 개수
-      -> 30장 이상 월에서도 한 번에 다 돌지 않고, 여러 cron 주기에 나눠 처리하게 만든다.
+    - max_new_per_run: 한 번 실행에서 처리할 신규 최대 개수
+    - MANUAL_SKIP_DIARY_IDS: 현재 서버에서 문제를 일으키는 특정 diary 임시 제외
     """
     start, end = parse_month_range(target_month)
 
@@ -131,6 +136,13 @@ async def process_month(user_id: int, target_month: str, batch_size: int, sleep_
         processed_since_sleep = 0
 
         for diary in diaries:
+            # 임시 수동 제외 대상 처리
+            # 현재는 diary_id=852를 문제 이미지로 판단하여 월 리포트 확보를 위해 제외
+            if diary.id in MANUAL_SKIP_DIARY_IDS:
+                print(f"[SKIP_MANUAL] diary_id={diary.id} -> 문제 이미지로 임시 제외")
+                skip_count += 1
+                continue
+
             # 한 번 실행에서 신규 처리 최대 개수 제한
             if success_count >= max_new_per_run:
                 print(f"[STOP] 신규 처리 최대 개수({max_new_per_run}) 도달 -> 이번 실행 종료")
