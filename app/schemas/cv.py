@@ -1,4 +1,5 @@
 # app/schemas/cv.py
+
 from datetime import datetime
 from typing import List, Optional, Literal
 from pydantic import BaseModel, Field
@@ -12,9 +13,11 @@ class AppearanceBBox(BaseModel):
 class FavoriteObjectItem(BaseModel):
     rank: int
     category: str
+    category_kr: Optional[str] = None
     is_new: bool
     photo_count: int
-    appearances: List[AppearanceBBox]
+    photos: List[str] = Field(default_factory=list)
+    appearances: List[AppearanceBBox] = Field(default_factory=list)
 
 
 class BestCut(BaseModel):
@@ -32,6 +35,8 @@ class EmotionSummaryItem(BaseModel):
 
 class HighlightPlaceItem(BaseModel):
     rank: int
+    place_key: str
+    place_label: str
     is_new: bool
     photo_count: int
     photos: List[str]
