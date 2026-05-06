@@ -36,6 +36,18 @@ import coil.compose.AsyncImage
 import com.example.aiary.data.KeywordAnnotation
 import com.example.aiary.data.MonthlyReportResponse
 import kotlin.math.absoluteValue
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import coil.compose.AsyncImage
+import androidx.compose.runtime.*
 
 val BackgroundBlueGray = Color(0xFFF4F7FC)
 val KeywordBlue = Color(0xFF4A90E2)
@@ -46,7 +58,7 @@ val TextDarkGray = Color(0xFF333333)
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun BookStoryScreen(
-    reportData: MonthlyReportResponse, // 👈 파라미터가 찐 데이터로 변경됨!
+    reportData: MonthlyReportResponse,
     onBack: () -> Unit
 ) {
     // 팝업에 띄울 클릭된 키워드 정보 저장
@@ -189,7 +201,7 @@ fun ReportSection(title: String, fullText: String, annotations: List<KeywordAnno
     }
 }
 
-// 📊 [화면 2] 데이터 리포트
+// 데이터 리포트
 @Composable
 fun DataReportPage(reportData: MonthlyReportResponse) {
     // 백엔드의 keyword_photo_index를 분석해서 타입별로 사진 분류!
@@ -225,15 +237,21 @@ fun DataCard(title: String, photos: List<String>) {
 
 @Composable
 fun CategoryPhotoRow(title: String, photos: List<String>) {
+    var selectedImageUrl by remember { mutableStateOf<String?>(null) }
+
     Column {
         Text(text = title, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextDarkGray, modifier = Modifier.padding(bottom = 12.dp))
         if (photos.isNotEmpty()) {
             LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 items(photos) { url ->
                     AsyncImage(
-                        model = url, // 백엔드에서 준 full_image_url 이므로 바로 사용 가능!
+                        model = url,
                         contentDescription = null, contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(100.dp).clip(RoundedCornerShape(12.dp)).background(Color.LightGray)
+                        modifier = Modifier
+                            .size(100.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.LightGray)
+                            .clickable { selectedImageUrl = url }
                     )
                 }
             }
@@ -243,10 +261,20 @@ fun CategoryPhotoRow(title: String, photos: List<String>) {
             }
         }
     }
+
+    selectedImageUrl?.let { url ->
+        FullScreenImageDialog(
+            imageUrl = url,
+            onDismiss = { selectedImageUrl = null } 
+        )
+    }
 }
 
 @Composable
 fun KeywordPhotoDialog(keyword: String, photoUrls: List<String>, onDismiss: () -> Unit) {
+    // 팝업창 안에서도 확대할 사진 주소를 저장할 상태 추가
+    var selectedImageUrl by remember { mutableStateOf<String?>(null) }
+
     AlertDialog(
         onDismissRequest = onDismiss, containerColor = Color.White, shape = RoundedCornerShape(20.dp),
         title = {
@@ -256,17 +284,74 @@ fun KeywordPhotoDialog(keyword: String, photoUrls: List<String>, onDismiss: () -
             }
         },
         text = {
-            Text(text = "${photoUrls.size}개의 순간", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(bottom = 16.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                items(photoUrls) { url ->
-                    AsyncImage(
-                        model = url, // 여기도 full_image_url
-                        contentDescription = "Keyword Photo", contentScale = ContentScale.Crop,
-                        modifier = Modifier.size(120.dp).clip(RoundedCornerShape(12.dp)).background(Color.LightGray)
-                    )
+            Column {
+                Text(text = "${photoUrls.size}개의 순간", color = Color.Gray, fontSize = 14.sp, modifier = Modifier.padding(bottom = 16.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    items(photoUrls) { url ->
+                        AsyncImage(
+                            model = url,
+                            contentDescription = "Keyword Photo", contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(120.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.LightGray)
+                                // 썸네일 클릭 시, 선택된 이미지 주소 저장
+                                .clickable { selectedImageUrl = url }
+                        )
+                    }
                 }
             }
         },
         confirmButton = {}
     )
+
+    // 선택된 이미지가 있으면 전체화면 다이얼로그 띄우기
+    selectedImageUrl?.let { url ->
+        FullScreenImageDialog(
+            imageUrl = url,
+            onDismiss = { selectedImageUrl = null }
+        )
+    }
+}
+
+@Composable
+fun FullScreenImageDialog(
+    imageUrl: String,
+    onDismiss: () -> Unit // 닫기 동작
+) {
+    // Dialog를 띄웁니다.
+    Dialog(
+        onDismissRequest = { onDismiss() },
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.9f)) 
+                .clickable { onDismiss() } 
+        ) {
+            // 확대된 원본 이미지
+            AsyncImage(
+                model = imageUrl,
+                contentDescription = "확대된 사진",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit 
+            )
+
+            // 우측 상단 X (닫기) 버튼
+            IconButton(
+                onClick = { onDismiss() },
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "닫기",
+                    tint = Color.White,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        }
+    }
 }
