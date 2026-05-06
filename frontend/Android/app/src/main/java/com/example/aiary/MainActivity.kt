@@ -35,6 +35,26 @@ import com.example.aiary.data.UserSession
 import org.json.JSONObject
 import androidx.compose.ui.layout.ContentScale
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.aiary.ui.theme.AiaryLoginTheme
+import kotlinx.coroutines.launch
+
 // 색상 정의
 val PrimaryBlue = Color(0xFF87CEFA)
 val DarkGray = Color(0xFF333333)
@@ -58,7 +78,7 @@ class MainActivity : ComponentActivity() {
                     val savedUserId = sharedPref.getInt("userId", -1)
                     val savedEmail = sharedPref.getString("userEmail", "")
 
-                    // 저장된 토큰이 있다면? -> UserSession을 복구하고 바로 홈 화면으로!
+                    // 저장된 토큰이 있다면? -> UserSession을 복구하고 바로 홈 화면으로
                     if (savedToken != null && savedUserId != -1) {
                         UserSession.accessToken = savedToken
                         UserSession.userId = savedUserId
@@ -74,31 +94,46 @@ class MainActivity : ComponentActivity() {
                     contentWindowInsets = WindowInsets(0.dp)
                 ) { innerPadding ->
                     Box(modifier = Modifier.padding(innerPadding)) {
-                        when (currentScreen) {
-                            0 -> LoginScreen(
-                                onLoginSuccess = { currentScreen = 1 },
-                                onSignUpClick = { currentScreen = 3 }
-                            )
-                            1 -> HomeScreen(onNavigateToUpload = { currentScreen = 2 },
-                                onLogout = {
-                                    // 로그아웃 시 아이디, 이메일, 토큰 기억을 비움
-                                    UserSession.clear()
-                                    // 핸드폰 창고도 싹 비우기!
-                                    val sharedPref = context.getSharedPreferences("aiary_prefs",
-                                        android.content.Context.MODE_PRIVATE)
-                                    sharedPref.edit()
-                                        .remove("accessToken") // 토큰 지우기
-                                        .remove("userId")      // 아이디 지우기
-                                        .remove("userEmail")   // 이메일 지우기
-                                        .apply()
+                        AnimatedContent(
+                            targetState = currentScreen,
+                            transitionSpec = {
+                                // 화면이 오른쪽에서 밀려 들어오고 왼쪽으로 살짝 빠지는 슬라이드 효과
+                                (slideInHorizontally(
+                                    animationSpec = tween(400),
+                                    initialOffsetX = { fullWidth -> fullWidth }
+                                ) + fadeIn(animationSpec = tween(400))) togetherWith
+                                        (slideOutHorizontally(
+                                            animationSpec = tween(400),
+                                            targetOffsetX = { fullWidth -> -fullWidth / 3 }
+                                        ) + fadeOut(animationSpec = tween(400)))
+                            },
+                            label = "Screen Transition"
+                        ) { targetScreen ->
+                            when (targetScreen) {
+                                0 -> LoginScreen(
+                                    onLoginSuccess = { currentScreen = 1 },
+                                    onSignUpClick = { currentScreen = 3 }
+                                )
+                                1 -> HomeScreen(
+                                    onNavigateToUpload = { currentScreen = 2 },
+                                    onLogout = {
+                                        UserSession.clear()
+                                        val sharedPref = context.getSharedPreferences("aiary_prefs",
+                                            android.content.Context.MODE_PRIVATE)
+                                        sharedPref.edit()
+                                            .remove("accessToken")
+                                            .remove("userId")
+                                            .remove("userEmail")
+                                            .apply()
 
-                                    currentScreen = 0
-                                    Toast.makeText(context, "로그아웃 되었습니다.",
-                                        Toast.LENGTH_SHORT).show()
-                                }
-                            )
-                            2 -> ImageUploadScreen(onBack = { currentScreen = 1 })
-                            3 -> SignUpScreen(onNavigateToLogin = { currentScreen = 0 })
+                                        currentScreen = 0
+                                        Toast.makeText(context, "로그아웃 되었습니다.",
+                                            Toast.LENGTH_SHORT).show()
+                                    }
+                                )
+                                2 -> ImageUploadScreen(onBack = { currentScreen = 1 })
+                                3 -> SignUpScreen(onNavigateToLogin = { currentScreen = 0 })
+                            }
                         }
                     }
                 }
@@ -115,7 +150,7 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val context = LocalContext.current
-    val logoFontFamily = FontFamily(Font(R.font.jalnan)) // 폰트 파일이 있는지 확인 필요
+    val logoFontFamily = FontFamily(Font(R.font.jalnan)) 
     val coroutineScope = rememberCoroutineScope()
 
     Column(
@@ -203,7 +238,7 @@ fun LoginScreen(
                                 UserSession.userEmail = email  // 입력했던 이메일 저장
                                 UserSession.accessToken = accessToken
 
-                                // 핸드폰 창고(SharedPreferences)에 정보 저장하기
+                                // SharedPreferences에 정보 저장하기
                                 val sharedPref = context.getSharedPreferences("aiary_prefs", android.content.Context.MODE_PRIVATE)
                                 with(sharedPref.edit()) {
                                     putString("accessToken", accessToken)
@@ -283,7 +318,6 @@ fun getUserIdFromToken(token: String): Int {
         val payload = String(Base64.decode(parts[1], Base64.URL_SAFE))
         val json = JSONObject(payload)
 
-        // 백엔드 user.py에서 'sub'에 user.id를 넣었음
         return json.getString("sub").toInt()
     } catch (e: Exception) {
         e.printStackTrace()
