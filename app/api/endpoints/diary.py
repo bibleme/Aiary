@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.crud import get_or_create_vision_image
 from app.db.database import get_db_session
 from app.db.model import Diary, DailyDiary, User
 from app.schemas.diary import (
@@ -20,6 +21,7 @@ from app.services.ai_generator import generate_one_line_diary
 from app.services.daily_diary_generator import generate_daily_diary
 from app.services.security import get_current_user
 from app.config import settings
+from app.services.storage import save_uploaded_image
 
 router = APIRouter(tags=["diaries"])
 
@@ -143,23 +145,29 @@ async def create_diary(
 
         one_line = await generate_one_line_diary(image_bytes, GPT_USER_PROMPT)
 
-        filename = _generate_filename(photo.filename or "image.jpg")
-        file_path = IMAGES_DIR / filename
-        with open(file_path, "wb") as f:
-            f.write(image_bytes)
-
-        image_url = f"/media/images/{filename}"
+        storage_result = save_uploaded_image(
+            image_bytes=image_bytes,
+            user_id=current_user.id,
+            original_filename=photo.filename or "image.jpg",
+            content_type=photo.content_type,
+            diary_date=diary_date,
+        )
 
         new_diary = Diary(
             user_id=current_user.id,
             content=one_line,
-            image_url=image_url,
+            image_url=storage_result["image_url"],
+            image_storage=storage_result["image_storage"],
+            image_key=storage_result["image_key"],
+            image_filename=storage_result["image_filename"],
             diary_date=diary_date,
         )
 
         db.add(new_diary)
         await db.commit()
         await db.refresh(new_diary)
+        
+        await get_or_create_vision_image(db, new_diary)
 
         return _serialize_diary(new_diary)
 

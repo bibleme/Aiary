@@ -12,13 +12,11 @@ from PIL import Image
 from app.config import settings
 from app.db.model import Diary
 from app.services.cv_loader import load_cv_models
+from app.services.image_resolver import (
+    resolve_image_path_for_cv,
+    cleanup_temp_image,
+)
 
-
-def resolve_local_image_path(image_url: str) -> Path:
-    if image_url.startswith("/media/images/"):
-        filename = image_url.split("/")[-1]
-        return Path(settings.IMAGE_UPLOAD_DIR) / filename
-    raise FileNotFoundError(f"지원하지 않는 image_url 형식입니다: {image_url}")
 
 
 def classify_scene(models: dict[str, Any], image: Image.Image) -> tuple[str, list[float]]:
@@ -135,11 +133,40 @@ def build_interactions(persons: list[dict], objects: list[dict]) -> list[dict]:
 
 async def run_cv_for_diary(diary: Diary) -> dict:
     models = load_cv_models()
-    image_path = resolve_local_image_path(diary.image_url)
+    image_path, is_temp = resolve_image_path_for_cv(
+        image_url=diary.image_url,
+        image_storage=getattr(diary, "image_storage", "local"),
+        image_key=getattr(diary, "image_key", None),
+    )
+
     if not image_path.exists():
         raise FileNotFoundError(f"이미지 파일이 존재하지 않습니다: {image_path}")
 
-    img_pil = Image.open(image_path).convert("RGB")
+    try:
+        img_pil = Image.open(image_path).convert("RGB")
+
+        predicted_tag, scene_vector = classify_scene(models, img_pil)
+        objects = detect_objects(models, image_path, img_pil)
+
+        # 현재 운영 안정판에서는 DeepFace OFF
+        target_child_found = False
+        target_child_confidence = None
+        persons = []
+
+        interactions = build_interactions(persons, objects)
+
+        return {
+            "predicted_tag": predicted_tag,
+            "scene_vector": scene_vector,
+            "target_child_found": target_child_found,
+            "target_child_confidence": target_child_confidence,
+            "persons": persons,
+            "objects": objects,
+            "interactions": interactions,
+        }
+
+    finally:
+        cleanup_temp_image(image_path, is_temp)
 
     predicted_tag, scene_vector = classify_scene(models, img_pil)
     objects = detect_objects(models, image_path, img_pil)

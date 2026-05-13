@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     CV_SCENE_CLUSTER_THRESHOLD: float = 0.88
     CV_TARGET_CHILD_VERIFY_THRESHOLD: float = 0.35
     CV_BATCH_LIMIT: int = 20
+    
+    STORAGE_BACKEND: str = "s3"
+    AWS_REGION: str = "ap-northeast-2"
+    AWS_S3_BUCKET: str = ""
+    AWS_S3_PREFIX: str = "users"
+    AWS_S3_PUBLIC_BASE_URL: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",
