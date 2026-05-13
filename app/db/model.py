@@ -93,6 +93,8 @@ class DailyDiary(Base):
     model_version = Column(String, nullable=True)
     generation_meta = Column(JSON, nullable=True)
     source_count = Column(Integer, nullable=False, default=0)
+    source_hash = Column(String(64), nullable=False, default="")
+    last_source_created_at = Column(DateTime, nullable=True)
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     updated_at = Column(

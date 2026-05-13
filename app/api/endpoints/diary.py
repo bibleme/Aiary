@@ -1,4 +1,5 @@
 # app/api/endpoints/diary.py
+import hashlib
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -55,6 +56,57 @@ def _generate_filename(original_name: str) -> str:
     ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     uid = uuid4().hex[:8]
     return f"{ts}_{uid}{ext}"
+
+def _compute_daily_source_snapshot(diaries: list[Diary]) -> dict:
+    hasher = hashlib.sha256()
+
+    for diary in diaries:
+        hasher.update(
+            (
+                f"{diary.id}|"
+                f"{diary.diary_date}|"
+                f"{diary.created_at.isoformat() if diary.created_at else ''}|"
+                f"{diary.content}|"
+                f"{diary.image_url}"
+            ).encode("utf-8")
+        )
+
+    return {
+        "source_count": len(diaries),
+        "source_hash": hasher.hexdigest() if diaries else "",
+        "last_source_created_at": diaries[-1].created_at if diaries else None,
+    }
+
+
+def _build_daily_outdated_info(
+    daily_diary: DailyDiary,
+    current_snapshot: dict,
+) -> dict:
+    stored_hash = daily_diary.source_hash or ""
+    current_hash = current_snapshot["source_hash"]
+
+    if not stored_hash:
+        return {
+            "is_outdated": True,
+            "outdated_reason": "source snapshot missing",
+        }
+
+    if daily_diary.source_count != current_snapshot["source_count"]:
+        return {
+            "is_outdated": True,
+            "outdated_reason": "source count changed",
+        }
+
+    if stored_hash != current_hash:
+        return {
+            "is_outdated": True,
+            "outdated_reason": "source content changed",
+        }
+
+    return {
+        "is_outdated": False,
+        "outdated_reason": None,
+    }
 
 
 def _serialize_diary(diary: Diary) -> dict:
