@@ -531,7 +531,7 @@ def load_model():
 # Server entrypoint
 # ============================
 
-async def generate_daily_diary_v3_eval(one_line_diaries: List[str]) -> Dict[str, Any]:
+async def generate_daily_diary_realistic_daily(one_line_diaries: List[str]) -> Dict[str, Any]:
     global _model, _tokenizer, _device
 
     lines = dedupe_keep_order(one_line_diaries)
