@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     IMAGE_UPLOAD_DIR: str
     DAILY_DIARY_MODEL_DIR: str
+    DAILY_DIARY_RUNTIME_VERSION: str = "realistic_daily"
 
     OPENAI_API_KEY: str = ""
     PUBLIC_BASE_URL: str = "http://3.35.185.251:8000"

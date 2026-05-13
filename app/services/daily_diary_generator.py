@@ -4,11 +4,13 @@ from __future__ import annotations
 import os
 from typing import Dict, List
 
+from app.config import settings
+
 from app.services.daily_diary_generator_v2 import generate_daily_diary_v2
 from app.services.daily_diary_generator_v3_eval import generate_daily_diary_v3_eval
 from app.services.daily_diary_generator_realistic_daily import generate_daily_diary_realistic_daily
 
-DEFAULT_DAILY_DIARY_MODEL_VERSION = os.getenv("DAILY_DIARY_RUNTIME_VERSION", "v3_eval").strip().lower()
+DEFAULT_DAILY_DIARY_MODEL_VERSION = settings.DAILY_DIARY_RUNTIME_VERSION.strip().lower()
 
 
 async def generate_daily_diary(
@@ -50,8 +52,8 @@ async def generate_daily_diary(
         "one_lines": result.get("one_lines", one_line_list),
         "bullet_lines": result.get("bullet_lines"),
         "combined_summary": result.get("combined_summary"),
-	"model_input": result.get("model_input"),
-	"decode_config": result.get("decode_config"),
-	"decode_score": result.get("decode_score"),
-	"generation_meta": result.get("generation_meta"),
+	    "model_input": result.get("model_input"),
+	    "decode_config": result.get("decode_config"),
+	    "decode_score": result.get("decode_score"),
+	    "generation_meta": result.get("generation_meta"),
     }
