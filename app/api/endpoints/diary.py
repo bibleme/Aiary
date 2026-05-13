@@ -352,7 +352,9 @@ async def create_daily_diary(
 
         existing = await _get_daily_diary(db, current_user.id, target_date)
         if existing:
-            return _serialize_daily_diary(existing)
+            diaries = await _get_one_line_diaries_for_date(db, current_user.id, target_date)
+            snapshot = _compute_daily_source_snapshot(diaries)
+            return _serialize_daily_diary(existing, snapshot)
 
         diaries = await _get_one_line_diaries_for_date(db, current_user.id, target_date)
         if not diaries:
@@ -526,7 +528,7 @@ async def regenerate_daily_diary(
             # edited_content / edited_at 은 유지
             await db.commit()
             await db.refresh(existing)
-            return _serialize_daily_diary(existing. snapshot)
+            return _serialize_daily_diary(existing, snapshot)
 
         new_daily_diary = DailyDiary(
             user_id=current_user.id,
