@@ -6,6 +6,7 @@ from typing import Dict, List
 
 from app.services.daily_diary_generator_v2 import generate_daily_diary_v2
 from app.services.daily_diary_generator_v3_eval import generate_daily_diary_v3_eval
+from app.services.daily_diary_generator_realistic_daily import generate_daily_diary_realistic_daily
 
 DEFAULT_DAILY_DIARY_MODEL_VERSION = os.getenv("DAILY_DIARY_RUNTIME_VERSION", "v3_eval").strip().lower()
 
@@ -32,12 +33,14 @@ async def generate_daily_diary(
 
     if selected_version == "v2":
         result = await generate_daily_diary_v2(one_line_list)
+    elif selected_version in {"realistic_daily", "v4", "round5_realistic"}:
+    	result = await generate_daily_diary_realistic_daily(one_line_list)
     elif selected_version in {"v3", "v3_eval"}:
         result = await generate_daily_diary_v3_eval(one_line_list)
     else:
         raise ValueError(
             f"지원하지 않는 하루일기 모델 버전입니다: {selected_version}. "
-            f"허용값: v2, v3, v3_eval"
+            f"허용값: v2, v3, v3_eval, realistic_daily, v4, round5_realistic"
         )
 
     return {
@@ -47,4 +50,8 @@ async def generate_daily_diary(
         "one_lines": result.get("one_lines", one_line_list),
         "bullet_lines": result.get("bullet_lines"),
         "combined_summary": result.get("combined_summary"),
+	"model_input": result.get("model_input"),
+	"decode_config": result.get("decode_config"),
+	"decode_score": result.get("decode_score"),
+	"generation_meta": result.get("generation_meta"),
     }
