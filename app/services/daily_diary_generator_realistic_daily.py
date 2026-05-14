@@ -546,17 +546,22 @@ async def generate_daily_diary_realistic_daily(one_line_diaries: List[str]) -> D
 
     tokenizer, model, device = _tokenizer, _model, _device
     result = generate_best(model, tokenizer, lines, device)
-
+    
+    best = result["best"]
     return {
         "one_lines_count": len(result["one_lines"]),
         "one_lines": result["one_lines"],
         "generated_diary": result["diary"],
         "model_version": "realistic_daily_2026-05-13",
         "model_input": result["model_input"],
-        "decode_config": result["best"]["decode_config"],
-        "decode_score": result["best"]["score"],
+        "decode_config": best["decode_config"],
+        "decode_score": best["score"],
         "generation_meta": {
-            "best": result["best"],
-            "candidates": result["candidates"],
+            "generation_strategy": "realistic_daily",
+            "model_version": "realistic_daily_2026-05-13",
+            "decode_config": best["decode_config"],
+            "decode_score": best["score"],
+            "metrics": best.get("metrics"),
+            "one_lines_count": len(result["one_lines"]),
         },
     }

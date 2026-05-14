@@ -385,7 +385,7 @@ async def create_daily_diary(
             generated_content=full_diary,
             edited_content=None,
             model_version=gen_result.get("model_version"),
-            generation_meta={
+            generation_meta=gen_result.get("generation_meta") or {
                 "one_lines_count": gen_result.get("one_lines_count"),
                 "bullet_lines": gen_result.get("bullet_lines"),
                 "combined_summary": gen_result.get("combined_summary"),
@@ -516,7 +516,7 @@ async def regenerate_daily_diary(
             existing.content = full_diary  # 임시 호환용
             existing.generated_content = full_diary
             existing.model_version = gen_result.get("model_version")
-            existing.generation_meta = {
+            existing.generation_meta = gen_result.get("generation_meta") or {
                 "one_lines_count": gen_result.get("one_lines_count"),
                 "bullet_lines": gen_result.get("bullet_lines"),
                 "combined_summary": gen_result.get("combined_summary"),
@@ -537,7 +537,7 @@ async def regenerate_daily_diary(
             generated_content=full_diary,
             edited_content=None,
             model_version=gen_result.get("model_version"),
-            generation_meta={
+            generation_meta=gen_result.get("generation_meta") or {
                 "one_lines_count": gen_result.get("one_lines_count"),
                 "bullet_lines": gen_result.get("bullet_lines"),
                 "combined_summary": gen_result.get("combined_summary"),
