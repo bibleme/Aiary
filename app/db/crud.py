@@ -1,7 +1,7 @@
 # app/db/crud.py
 from pathlib import Path
 from typing import Optional, List
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -158,6 +158,9 @@ async def save_cv_result(
     vision_image.target_child_found = target_child_found
     vision_image.target_child_confidence = target_child_confidence
     vision_image.cv_status = "done"
+    vision_image.basic_cv_status = "done"
+    vision_image.locked_at = None
+    vision_image.last_error = None
     vision_image.error_message = None
     vision_image.processed_at = datetime.utcnow()
 
@@ -256,6 +259,79 @@ async def get_pending_vision_images(db: AsyncSession, limit: int = 20) -> list[V
         .limit(limit)
     )
     return list(result.scalars().all())
+
+async def get_next_pending_vision_images_for_worker(
+    db: AsyncSession,
+    limit: int = 1,
+    lock_timeout_minutes: int = 30,
+) -> list[VisionImage]:
+    cutoff = datetime.utcnow() - timedelta(minutes=lock_timeout_minutes)
+
+    result = await db.execute(
+        select(VisionImage)
+        .where(
+            VisionImage.cv_status.in_(["pending", "failed"]),
+            VisionImage.basic_cv_attempts < 3,
+        )
+        .where(
+            (VisionImage.locked_at.is_(None)) |
+            (VisionImage.locked_at < cutoff)
+        )
+        .order_by(VisionImage.created_at.asc(), VisionImage.id.asc())
+        .limit(limit)
+    )
+
+    rows = list(result.scalars().all())
+
+    for row in rows:
+        row.cv_status = "processing"
+        row.basic_cv_status = "processing"
+        row.locked_at = datetime.utcnow()
+        row.last_error = None
+
+    await db.commit()
+
+    for row in rows:
+        await db.refresh(row)
+
+    return rows
+
+
+async def mark_basic_cv_done(
+    db: AsyncSession,
+    vision_image: VisionImage,
+) -> VisionImage:
+    vision_image.cv_status = "done"
+    vision_image.basic_cv_status = "done"
+    vision_image.locked_at = None
+    vision_image.last_error = None
+    vision_image.processed_at = datetime.utcnow()
+
+    db.add(vision_image)
+    await db.commit()
+    await db.refresh(vision_image)
+
+    return vision_image
+
+
+async def mark_basic_cv_failed(
+    db: AsyncSession,
+    vision_image: VisionImage,
+    error_message: str,
+) -> VisionImage:
+    vision_image.cv_status = "failed"
+    vision_image.basic_cv_status = "failed"
+    vision_image.basic_cv_attempts = int(vision_image.basic_cv_attempts or 0) + 1
+    vision_image.locked_at = None
+    vision_image.last_error = error_message[:2000]
+    vision_image.error_message = error_message[:2000]
+    vision_image.processed_at = datetime.utcnow()
+
+    db.add(vision_image)
+    await db.commit()
+    await db.refresh(vision_image)
+
+    return vision_image
 
 
 async def save_face_cv_result(

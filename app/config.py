@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     CV_TARGET_CHILD_VERIFY_THRESHOLD: float = 0.35
     CV_BATCH_LIMIT: int = 20
     
+    CV_LOAD_POSE_MODEL: bool = False
+    CV_USE_SIGLIP_EMBEDDINGS: bool = False
+    CV_WORKER_BATCH_LIMIT: int = 1
+    
     STORAGE_BACKEND: str = "s3"
     AWS_REGION: str = "ap-northeast-2"
     AWS_S3_BUCKET: str = ""
