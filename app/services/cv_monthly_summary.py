@@ -39,6 +39,7 @@ PLACE_KR_MAP = {
 
 OBJECT_KR_MAP = {
     "teddy bear": "인형",
+    "bear": "인형",
     "dog": "강아지",
     "cat": "고양이",
     "cup": "컵",
@@ -46,23 +47,77 @@ OBJECT_KR_MAP = {
     "book": "책",
     "ball": "공",
     "handbag": "가방",
+    "backpack": "가방",
     "potted plant": "화분",
     "bowl": "그릇",
+    "spoon": "숟가락",
+    "fork": "포크",
     "toy": "장난감",
+    "kite": "장난감",
+    "frisbee": "장난감",
+    "skateboard": "놀이기구",
+    "snowboard": "놀이기구",
 }
 
-
 # 월별 대표 물건에서 제외할 너무 일반적이거나 리포트 가치가 낮은 객체
+# 월별 대표 물건에서 제외할 객체
+# 원칙:
+# - 사람/가구/배경성 객체 제외
+# - YOLO COCO 오탐이 잦고 육아 리포트 가치가 낮은 객체 제외
+# - 단, bottle/book/ball/teddy bear/cup 등은 유지
 EXCLUDED_OBJECT_CATEGORIES = {
+    # 사람/신체
     "person",
+    # 가구/배경
     "chair",
     "couch",
     "bed",
     "dining table",
+    "bench",
+    "toilet",
+    "sink",
+    # 전자기기/생활 배경
     "tv",
     "laptop",
     "cell phone",
+    "keyboard",
+    "mouse",
+    "remote",
+    # 차량/거리 오탐 가능성
+    "car",
+    "truck",
+    "bus",
+    "motorcycle",
+    "bicycle",
+    # 배경 시설물/오탐 잦음
+    "fire hydrant",
+    "stop sign",
+    "parking meter",
+    "traffic light",
+    # 음식 오탐 중 리포트 가치 낮거나 오탐 잦은 것
+    "donut",
+    "cake",
+    "pizza",
+    "sandwich",
+    "hot dog",
+    # 너무 일반적이거나 상황 해석 가치 낮음
+    "sports ball",
 }
+
+MIN_OBJECT_CONFIDENCE = 0.45
+def _is_reportable_object(category: str | None) -> bool:
+    if not category:
+        return False
+    return category not in EXCLUDED_OBJECT_CATEGORIES
+def _best_object_confidence(appearances: list) -> float:
+    best = 0.0
+    for ap in appearances:
+        try:
+            conf = float(ap.confidence or 0.0)
+        except Exception:
+            conf = 0.0
+        best = max(best, conf)
+    return best
 
 
 def _empty_summary(target_month: str) -> dict:
@@ -172,7 +227,10 @@ async def generate_cv_monthly_summary(
             continue
 
         category = obj.base_category
-        if not category or category in EXCLUDED_OBJECT_CATEGORIES:
+        if not _is_reportable_object(category):
+            continue
+        obj_appearances = appearance_map.get(("object", obj.id), [])
+        if _best_object_confidence(obj_appearances) < MIN_OBJECT_CONFIDENCE:
             continue
 
         object_counter[category] += 1
@@ -196,7 +254,10 @@ async def generate_cv_monthly_summary(
         for obj in objects:
             category = obj.base_category
 
-            if not category or category in EXCLUDED_OBJECT_CATEGORIES:
+            if not _is_reportable_object(category):
+                continue
+            obj_appearances = appearance_map.get(("object", obj.id), [])
+            if _best_object_confidence(obj_appearances) < MIN_OBJECT_CONFIDENCE:
                 continue
 
             object_counter[category] += 1
