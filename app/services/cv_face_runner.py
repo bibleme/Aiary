@@ -57,6 +57,19 @@ def verify_target_child(image_path: Path, ref_paths: list[Path]) -> tuple[bool, 
 
 def analyze_faces(image_path: Path, target_child_found: bool) -> list[dict[str, Any]]:
     from deepface import DeepFace
+    from PIL import Image
+    
+    #너무 작은 얼굴 제외
+    MIN_FACE_WIDTH = 90
+    MIN_FACE_HEIGHT = 90
+    MIN_FACE_AREA_RATIO = 0.006
+
+    try:
+        img = Image.open(image_path)
+        image_w, image_h = img.size
+        image_area = max(image_w * image_h, 1)
+    except Exception:
+        image_w, image_h, image_area = 0, 0, 1
 
     try:
         results = DeepFace.analyze(
@@ -71,34 +84,65 @@ def analyze_faces(image_path: Path, target_child_found: bool) -> list[dict[str, 
     if isinstance(results, dict):
         results = [results]
 
-    persons = []
-    for idx, item in enumerate(results):
+    candidates = []
+
+    for item in results:
         region = item.get("region") or {}
-        bbox = [
-            float(region.get("x", 0)),
-            float(region.get("y", 0)),
-            float(region.get("x", 0) + region.get("w", 0)),
-            float(region.get("y", 0) + region.get("h", 0)),
-        ]
+
+        x = float(region.get("x", 0))
+        y = float(region.get("y", 0))
+        w = float(region.get("w", 0))
+        h = float(region.get("h", 0))
+
+        if w <= 0 or h <= 0:
+            continue
+
+        area = w * h
+        area_ratio = area / image_area
+
+        if w < MIN_FACE_WIDTH or h < MIN_FACE_HEIGHT:
+            continue
+
+        if area_ratio < MIN_FACE_AREA_RATIO:
+            continue
+
         emotion = item.get("dominant_emotion")
         emotions = item.get("emotion") or {}
         emotion_score = float(emotions.get(emotion, 0.0)) if emotion else None
 
+        candidates.append(
+            {
+                "emotion": emotion,
+                "emotion_score": emotion_score,
+                "bbox": [x, y, x + w, y + h],
+                "face_confidence": emotion_score,
+                "_area": area,
+            }
+        )
+
+    if not candidates:
+        return []
+
+    candidates.sort(key=lambda x: x["_area"], reverse=True)
+
+    persons = []
+    for idx, item in enumerate(candidates):
         role = "other"
+
         if idx == 0 and target_child_found:
             role = "target_child"
-        elif idx == 0 and not target_child_found:
+        elif idx == 0:
             role = "assumed_child"
-        elif idx > 0 and target_child_found:
+        elif target_child_found:
             role = "adult_helper"
 
         persons.append(
             {
                 "role": role,
-                "emotion": emotion,
-                "emotion_score": emotion_score,
-                "bbox": bbox,
-                "face_confidence": emotion_score,
+                "emotion": item["emotion"],
+                "emotion_score": item["emotion_score"],
+                "bbox": item["bbox"],
+                "face_confidence": item["face_confidence"],
             }
         )
 
