@@ -1000,25 +1000,6 @@ async def generate_monthly_report_payload(
     else:
         report = make_rule_based_month_report(target_month, month_stat, highlights)
 
-    try:
-        report["cv_summary"] = await generate_cv_monthly_summary(
-            db=db,
-            user_id=user_id,
-            target_month=target_month,
-        )
-    except Exception as e:
-        logger.warning(
-            "cv monthly summary fallback: user_id=%s month=%s error=%s",
-            user_id,
-            target_month,
-            e,
-        )
-        report["cv_summary"] = {
-            "report_month": target_month,
-            "favorite_objects": [],
-            "emotions_summary": [],
-            "highlight_places": [],
-        }
         
     report["user_id"] = user_id
     report["generated_at"] = datetime.now(UTC).isoformat()
