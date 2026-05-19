@@ -19,14 +19,15 @@ from app.db.model import (
 
 
 EMOTION_KR_MAP = {
-    "happy": "기쁨/행복",
-    "neutral": "평온/집중",
-    "sad": "슬픔/시무룩",
-    "angry": "분노/화남",
-    "fear": "두려움/공포",
-    "surprise": "놀람/신남",
-    "disgust": "싫음/불편",
+    "happy": "밝은 표정",
+    "neutral": "차분한 표정",
+    "sad": "시무룩한 표정",
+    "angry": "진지한 표정",
+    "fear": "낯선 표정",
+    "surprise": "놀란 표정",
+    "disgust": "불편한 표정",
 }
+
 
 
 PLACE_KR_MAP = {
@@ -401,4 +402,9 @@ async def generate_cv_monthly_summary(
         "favorite_objects": favorite_objects,
         "emotions_summary": emotions_summary,
         "highlight_places": highlight_places,
+        "emotion_basis": {
+            "description": "얼굴이 명확히 감지된 사진 기준으로 산출한 참고용 표정 분석입니다.",
+            "analyzed_face_count": total_emotions,
+            "is_reference_only": True,
+        },
     }
