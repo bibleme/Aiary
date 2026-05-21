@@ -22,7 +22,7 @@ from app.services.ai_generator import generate_one_line_diary
 from app.services.daily_diary_generator import generate_daily_diary
 from app.services.security import get_current_user
 from app.config import settings
-from app.services.storage import save_uploaded_image
+from app.services.storage import save_uploaded_image, generate_presigned_image_url
 
 router = APIRouter(tags=["diaries"])
 
@@ -110,14 +110,20 @@ def _build_daily_outdated_info(
 
 
 def _serialize_diary(diary: Diary) -> dict:
+    image_url = generate_presigned_image_url(
+        image_storage=getattr(diary, "image_storage", None),
+        image_key=getattr(diary, "image_key", None),
+        image_url=diary.image_url,
+    )
     return {
         "id": diary.id,
         "user_id": diary.user_id,
         "content": diary.content,
-        "image_url": diary.image_url,
+        "image_url": image_url,
         "diary_date": diary.diary_date,
         "created_at": diary.created_at,
     }
+
 
 def _resolve_generated_content(daily_diary: DailyDiary) -> str:
     return daily_diary.generated_content or daily_diary.content or ""

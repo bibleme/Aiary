@@ -173,3 +173,25 @@ def save_uploaded_image(
         image_bytes=image_bytes,
         filename=filename,
     )
+    
+def generate_presigned_image_url(
+    *,
+    image_storage: str | None,
+    image_key: str | None,
+    image_url: str | None,
+    expires_in: int = 3600,
+) -> str | None:
+    if not image_url:
+        return None
+    if image_storage == "s3" and image_key:
+        s3 = boto3.client("s3", region_name=settings.AWS_REGION)
+        return s3.generate_presigned_url(
+            ClientMethod="get_object",
+            Params={
+                "Bucket": settings.AWS_S3_BUCKET,
+                "Key": image_key,
+            },
+            ExpiresIn=expires_in,
+        )
+    return image_url
+
