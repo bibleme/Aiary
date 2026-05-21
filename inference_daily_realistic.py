@@ -306,15 +306,11 @@ def candidate_score(one_lines: List[str], text: str) -> float:
     return round(score, 4)
 
 
-def decode_configs(one_line_count: int, args: argparse.Namespace) -> List[DecodeConfig]:
+def grounded_short_config(one_line_count: int, args: argparse.Namespace) -> DecodeConfig:
     bounds = sentence_bounds(one_line_count)
     token_floor = max(args.min_new_tokens, bounds["target_min"] * 18)
     token_mid = max(args.max_new_tokens, bounds["hard_max"] * 42)
-    return [
-        DecodeConfig("grounded_short", max(token_mid - 35, token_floor + 30), token_floor, max(3, args.num_beams), args.no_repeat_ngram_size, max(args.repetition_penalty, 1.20), 0.58),
-        DecodeConfig("balanced", token_mid, token_floor, max(4, args.num_beams), args.no_repeat_ngram_size, max(args.repetition_penalty, 1.16), 0.72),
-        DecodeConfig("coverage", token_mid + 30, token_floor, max(4, args.num_beams), args.no_repeat_ngram_size, max(args.repetition_penalty, 1.14), 0.86),
-    ]
+    return DecodeConfig("grounded_short", max(token_mid - 35, token_floor + 30), token_floor, max(3, args.num_beams), args.no_repeat_ngram_size, max(args.repetition_penalty, 1.20), 0.58)
 
 
 def select_device(name: str) -> torch.device:
@@ -357,27 +353,22 @@ def generate_best(model: Any, tokenizer: Any, one_lines: List[str], device: torc
     if not lines:
         raise ValueError("one_lines is empty")
     model_input = build_model_input(lines)
-    candidates = []
-    for cfg in decode_configs(len(lines), args):
-        raw = generate_with_config(model, tokenizer, model_input, device, cfg, args)
-        text = postprocess_output(raw, len(lines))
-        metrics = score_output(lines, text)
-        candidates.append(
-            {
-                "decode_config": cfg.name,
-                "decode_args": asdict(cfg),
-                "text": text,
-                "score": candidate_score(lines, text),
-                "metrics": metrics,
-            }
-        )
-    best = max(candidates, key=lambda c: c["score"])
+    cfg = grounded_short_config(len(lines), args)
+    raw = generate_with_config(model, tokenizer, model_input, device, cfg, args)
+    text = postprocess_output(raw, len(lines))
+    best = {
+        "decode_config": cfg.name,
+        "decode_args": asdict(cfg),
+        "text": text,
+        "score": candidate_score(lines, text),
+        "metrics": score_output(lines, text),
+    }
     return {
         "one_lines": lines,
         "model_input": model_input,
         "diary": best["text"],
         "best": best,
-        "candidates": candidates,
+        "candidates": [best],
     }
 
 
