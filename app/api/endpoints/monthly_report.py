@@ -14,6 +14,7 @@ from app.schemas.monthly_report import (
 from app.services.monthly_report_generator import (
     generate_and_store_monthly_report,
     get_monthly_report_status,
+    refresh_monthly_report_image_urls,
 )
 from app.services.monthly_report_loader import get_monthly_report_for_user
 from app.services.security import get_current_user
@@ -36,7 +37,11 @@ async def get_monthly_report(
     stored = result.scalar_one_or_none()
 
     if stored:
-        return stored.report_json
+        return await refresh_monthly_report_image_urls(
+            db=db,
+            user_id=current_user.id,
+            report=stored.report_json,
+        )
 
     if settings.MONTHLY_REPORT_USE_JSON_FALLBACK:
         fallback = get_monthly_report_for_user(current_user.id, target_month)
@@ -75,10 +80,15 @@ async def generate_monthly_report_api(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        return await generate_and_store_monthly_report(
+        report = await generate_and_store_monthly_report(
             db=db,
             user_id=current_user.id,
             target_month=target_month,
+        )
+        return await refresh_monthly_report_image_urls(
+            db=db,
+            user_id=current_user.id,
+            report=report,
         )
     except ValueError as e:
         raise HTTPException(
@@ -99,11 +109,17 @@ async def regenerate_monthly_report_api(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        return await generate_and_store_monthly_report(
+        report = await generate_and_store_monthly_report(
             db=db,
             user_id=current_user.id,
             target_month=target_month,
         )
+        return await refresh_monthly_report_image_urls(
+            db=db,
+            user_id=current_user.id,
+            report=report,
+        )
+
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
