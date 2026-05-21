@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
+from botocore.config import Config
 from fastapi import HTTPException, status
 
 from app.config import settings
@@ -184,7 +185,15 @@ def generate_presigned_image_url(
     if not image_url:
         return None
     if image_storage == "s3" and image_key:
-        s3 = boto3.client("s3", region_name=settings.AWS_REGION)
+        s3 = boto3.client(
+            "s3",
+            region_name=settings.AWS_REGION,
+            endpoint_url=f"https://s3.{settings.AWS_REGION}.amazonaws.com",
+            config=Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "virtual"},
+            ),
+        )
         return s3.generate_presigned_url(
             ClientMethod="get_object",
             Params={
