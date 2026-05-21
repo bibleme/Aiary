@@ -377,17 +377,21 @@ def candidate_score(one_lines: List[str], text: str) -> float:
 # ============================
 
 def decode_configs(one_line_count: int) -> List[DecodeConfig]:
+    """
+    운영 서버용 최종 설정.
+    기존에는 grounded_short / balanced / coverage 3개 후보를 생성한 뒤
+    점수가 가장 높은 후보를 선택했지만, t3.small 운영 환경에서는 시간이 오래 걸려
+    최종 운영 버전에서는 grounded_short 1개만 생성한다.
+    모델팀 최종 inference 코드의 grounded_short 설정을 서버 코드에 반영한 구조다.
+    """
     bounds = sentence_bounds(one_line_count)
-
     base_min_new_tokens = 20
     base_max_new_tokens = 300
     base_num_beams = 4
     base_no_repeat_ngram_size = 4
     base_repetition_penalty = 1.18
-
     token_floor = max(base_min_new_tokens, bounds["target_min"] * 18)
     token_mid = max(base_max_new_tokens, bounds["hard_max"] * 42)
-
     return [
         DecodeConfig(
             name="grounded_short",
@@ -397,25 +401,7 @@ def decode_configs(one_line_count: int) -> List[DecodeConfig]:
             no_repeat_ngram_size=base_no_repeat_ngram_size,
             repetition_penalty=max(base_repetition_penalty, 1.20),
             length_penalty=0.58,
-        ),
-        DecodeConfig(
-            name="balanced",
-            max_new_tokens=token_mid,
-            min_new_tokens=token_floor,
-            num_beams=max(4, base_num_beams),
-            no_repeat_ngram_size=base_no_repeat_ngram_size,
-            repetition_penalty=max(base_repetition_penalty, 1.16),
-            length_penalty=0.72,
-        ),
-        DecodeConfig(
-            name="coverage",
-            max_new_tokens=token_mid + 30,
-            min_new_tokens=token_floor,
-            num_beams=max(4, base_num_beams),
-            no_repeat_ngram_size=base_no_repeat_ngram_size,
-            repetition_penalty=max(base_repetition_penalty, 1.14),
-            length_penalty=0.86,
-        ),
+        )
     ]
 
 
