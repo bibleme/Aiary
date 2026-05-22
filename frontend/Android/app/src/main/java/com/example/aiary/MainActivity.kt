@@ -55,7 +55,6 @@ import androidx.compose.ui.unit.sp
 import com.example.aiary.ui.theme.AiaryLoginTheme
 import kotlinx.coroutines.launch
 
-// 색상 정의
 val PrimaryBlue = Color(0xFF87CEFA)
 val DarkGray = Color(0xFF333333)
 val BackgroundBeige = Color(0xFFFFF99E)
@@ -109,6 +108,7 @@ class MainActivity : ComponentActivity() {
                             },
                             label = "Screen Transition"
                         ) { targetScreen ->
+                            // 반드시 currentScreen 대신 'targetScreen'을 써야 애니메이션이 안 꼬입니다
                             when (targetScreen) {
                                 0 -> LoginScreen(
                                     onLoginSuccess = { currentScreen = 1 },
@@ -150,7 +150,7 @@ fun LoginScreen(
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     val context = LocalContext.current
-    val logoFontFamily = FontFamily(Font(R.font.jalnan)) 
+    val logoFontFamily = FontFamily(Font(R.font.jalnan)) // 폰트 파일이 있는지 확인 필요
     val coroutineScope = rememberCoroutineScope()
 
     Column(
@@ -238,7 +238,7 @@ fun LoginScreen(
                                 UserSession.userEmail = email  // 입력했던 이메일 저장
                                 UserSession.accessToken = accessToken
 
-                                // SharedPreferences에 정보 저장하기
+                                // 핸드폰 창고(SharedPreferences)에 정보 저장하기
                                 val sharedPref = context.getSharedPreferences("aiary_prefs", android.content.Context.MODE_PRIVATE)
                                 with(sharedPref.edit()) {
                                     putString("accessToken", accessToken)
@@ -311,13 +311,13 @@ fun LoginScreenPreview() {
 // JWT 토큰 디코딩 함수
 fun getUserIdFromToken(token: String): Int {
     try {
-        // JWT는 3부분(Header.Body.Signature)으로 나뉨. Body(1번 인덱스)만 필요함.
         val parts = token.split(".")
         if (parts.size < 2) return -1
 
         val payload = String(Base64.decode(parts[1], Base64.URL_SAFE))
         val json = JSONObject(payload)
 
+        // 백엔드 user.py에서 'sub'에 user.id를 넣었음
         return json.getString("sub").toInt()
     } catch (e: Exception) {
         e.printStackTrace()
