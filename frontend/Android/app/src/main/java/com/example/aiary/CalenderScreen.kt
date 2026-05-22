@@ -36,10 +36,10 @@ fun CalendarScreen(onDateClick: (String) -> Unit) {
     // 현재 보여줄 '연도'와 '월'을 상태로 관리
     var currentYearMonth by remember { mutableStateOf(YearMonth.now()) }
 
-    // 일기가 작성된 날짜(일)들을 저장하는 Set (예: 5일, 12일에 썼다면 setOf(5, 12))
+    // 일기가 작성된 날짜들을 저장하는 Set 
     var writtenDays by remember { mutableStateOf<Set<Int>>(emptySet()) }
 
-    // 달(currentYearMonth)이 바뀔 때마다 서버에서 일기 목록을 확인합니다.
+    // 달이 바뀔 때마다 서버에서 일기 목록을 확인
     LaunchedEffect(currentYearMonth) {
         try {
             val myId = UserSession.userId
@@ -52,22 +52,20 @@ fun CalendarScreen(onDateClick: (String) -> Unit) {
             if (response.isSuccessful) {
                 val allDiaries = response.body() ?: emptyList()
 
-                // 현재 보고 있는 달을 "YYYY-MM" 형식으로 만듭니다 (예: "2025-12")
+                // 현재 보고 있는 달을 "YYYY-MM" 형식으로 만듭니다
                 val targetPrefix = String.format("%04d-%02d", currentYearMonth.year, currentYearMonth.monthValue)
 
-                // 이번 달에 해당하는 일기들의 '일(day)'만 뽑아내서 중복 제거(toSet)
+                // 이번 달에 해당하는 일기들의 '일'만 뽑아내서 중복 제거
                 val daysWithDiary = allDiaries.mapNotNull { diary ->
                     val dateStr = diary.diary_date ?: diary.created_at
-                    // 날짜 형태가 "2025-12-11T..." 라고 가정하고 앞부분이 일치하는지 확인
                     if (dateStr.startsWith(targetPrefix) && dateStr.length >= 10) {
-                        // 8번째부터 10번째 앞까지 자르면 "11" 같은 일(day)이 나옴
                         dateStr.substring(8, 10).toIntOrNull()
                     } else {
                         null
                     }
                 }.toSet()
 
-                writtenDays = daysWithDiary // 상태 업데이트 -> 화면이 다시 그려짐
+                writtenDays = daysWithDiary 
             }
         } catch (e: Exception) {
             Log.e("CalendarScreen", "일기 목록 불러오기 실패", e)
@@ -153,12 +151,12 @@ fun CalendarScreen(onDateClick: (String) -> Unit) {
                         modifier = Modifier.align(Alignment.Center)
                     )
 
-                    // 만약 이 날짜(day)에 일기가 쓰여 있다면 우측 상단에 빨간 점 표시!
+                    // 만약 이 날짜에 일기가 쓰여 있다면 우측 상단에 빨간 점 표시
                     if (writtenDays.contains(day)) {
                         Box(
                             modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(8.dp)
+                                .align(Alignment.TopEnd) 
+                                .padding(8.dp) 
                                 .size(6.dp) 
                                 .background(Color.Red, CircleShape) 
                         )
