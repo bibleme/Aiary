@@ -12,6 +12,8 @@ import kotlinx.coroutines.launch
 import com.example.aiary.data.*
 import com.example.aiary.network.RetrofitClient
 import org.json.JSONObject
+import androidx.compose.runtime.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun ReportWrapperScreen(
@@ -21,10 +23,14 @@ fun ReportWrapperScreen(
     val coroutineScope = rememberCoroutineScope()
     var isLoading by remember { mutableStateOf(true) }
     var reportStatus by remember { mutableStateOf<MonthlyReportStatusResponse?>(null) }
+
+    // 1️⃣ 두 종류의 데이터를 담을 상태(State) 변수
     var reportData by remember { mutableStateOf<MonthlyReportResponse?>(null) }
+    var cvData by remember { mutableStateOf<CVMonthlySummaryResponse?>(null) }
+
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    // 1. 화면이 켜지자마자 가장 먼저 [상태 조회] API를 호출합니다.
+    // 초기 상태 조회 및 데이터 로딩
     LaunchedEffect(targetMonth) {
         val token = "Bearer ${UserSession.accessToken}"
         try {
@@ -33,28 +39,33 @@ fun ReportWrapperScreen(
                 val status = statusRes.body()!!
                 reportStatus = status
 
-                // 상태 검사: 이미 만들어져 있고, 최신 상태라면 바로 리포트 내용을 조회!
-                if (status.exists && status.is_up_to_date) {
+                if (status.exists) {
                     val reportRes = RetrofitClient.api.getMonthlyReport(targetMonth, token)
-                    if (reportRes.isSuccessful) {
+                    // CV는 항상 최신 조회
+                    val cvRes = RetrofitClient.api.getCvMonthlySummary(targetMonth, token)
+
+                    if (reportRes.isSuccessful && cvRes.isSuccessful) {
                         reportData = reportRes.body()
+                        cvData = cvRes.body()
                     }
                 }
             }
         } catch (e: Exception) {
             e.printStackTrace()
+            errorMessage = "데이터를 불러오는 중 오류가 발생했습니다."
         } finally {
             isLoading = false
         }
     }
 
-    // API 요청 함수 (생성 or 재생성)
+    // 리포트 생성/업데이트 요청 함수
     val handleGenerateRequest = { isRegenerate: Boolean ->
         coroutineScope.launch {
             isLoading = true
             errorMessage = null
             val token = "Bearer ${UserSession.accessToken}"
             try {
+                // 2️⃣ 리포트 생성(혹은 업데이트) 요청
                 val response = if (isRegenerate) {
                     RetrofitClient.api.regenerateMonthlyReport(targetMonth, token)
                 } else {
@@ -62,17 +73,22 @@ fun ReportWrapperScreen(
                 }
 
                 if (response.isSuccessful) {
-                    reportData = response.body() // 성공하면 바로 책 데이터를 받아서 보여줌
+                    // 생성 성공 시 글 데이터를 먼저 받고,
+                    // 이어서 사진(CV) 데이터도 즉시 불러옵니다.
+                    reportData = response.body()
+                    val cvRes = RetrofitClient.api.getCvMonthlySummary(targetMonth, token)
+                    if (cvRes.isSuccessful) {
+                        cvData = cvRes.body()
+                    }
                 } else {
-                    // 에러 발생 시 (일기 5개 미만 등) 백엔드가 준 detail 메시지를 파싱해서 보여줌
                     val errorBody = response.errorBody()?.string()
                     if (errorBody != null) {
                         val json = JSONObject(errorBody)
-                        errorMessage = json.optString("detail", "리포트 생성 중 오류가 발생했습니다.")
+                        errorMessage = json.optString("detail", "리포트 생성 요건을 확인해 주세요.")
                     }
                 }
             } catch (e: Exception) {
-                errorMessage = "네트워크 오류가 발생했습니다."
+                errorMessage = "네트워크 연결 상태를 확인해 주세요."
             } finally {
                 isLoading = false
             }
@@ -84,11 +100,18 @@ fun ReportWrapperScreen(
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = PrimaryBlue)
         }
-    } else if (reportData != null) {
-        // [케이스 3] 리포트가 완성된 상태 -> 기존에 만든 예쁜 책 화면 보여주기!
-        BookStoryScreen(reportData = reportData!!, onBack = onBack)
-    } else if (reportStatus != null) {
-        // [케이스 1 & 2] 리포트가 없거나 업데이트가 필요한 상태
+    }
+    // 3️⃣ 글 데이터와 사진 데이터가 모두 있어야 책 화면으로 진입합니다.
+    else if (reportData != null && cvData != null) {
+        BookStoryScreen(
+            reportData = reportData!!,
+            cvData = cvData!!,
+            isUpToDate = reportStatus!!.is_up_to_date, 
+            onRegenerate = { handleGenerateRequest(true) }, 
+            onBack = onBack
+        )
+    }
+    else if (reportStatus != null) {
         Column(
             modifier = Modifier.fillMaxSize().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -97,20 +120,24 @@ fun ReportWrapperScreen(
             Text("📚 $targetMonth 리포트", fontSize = 24.sp, color = DarkGray, modifier = Modifier.padding(bottom = 16.dp))
 
             if (!reportStatus!!.exists) {
-                // exists = false -> 생성 버튼
                 Text("아직 이 달의 리포트가 없어요.\n지금 바로 만들어 볼까요?", color = Color.Gray, modifier = Modifier.padding(bottom = 32.dp))
                 Button(onClick = { handleGenerateRequest(false) }) {
                     Text("리포트 생성하기 ✨")
                 }
             } else if (!reportStatus!!.is_up_to_date) {
-                // exists = true & is_up_to_date = false -> 업데이트 버튼
                 Text("새로운 일기가 추가되었네요!\n리포트를 최신 내용으로 업데이트 할까요?", color = Color.Gray, modifier = Modifier.padding(bottom = 32.dp))
                 Button(onClick = { handleGenerateRequest(true) }) {
                     Text("리포트 업데이트 🔄")
                 }
             }
 
-            // 에러 메시지 텍스트 (예: "최소 5개의 기록이 필요해요")
+            else {
+                Text("리포트 데이터를 완전히 불러오지 못했어요.\n리포트를 다시 생성해 보시겠어요?", color = Color.Gray, modifier = Modifier.padding(bottom = 32.dp))
+                Button(onClick = { handleGenerateRequest(true) }) {
+                    Text("리포트 복구(재생성) 🛠️")
+                }
+            }
+
             if (errorMessage != null) {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(text = errorMessage!!, color = Color.Red, fontSize = 14.sp)
