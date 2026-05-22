@@ -5,6 +5,9 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.Response
 import retrofit2.http.*
+import retrofit2.http.PUT
+import retrofit2.http.Path
+import retrofit2.http.Header
 
 interface ApiService {
 
@@ -14,7 +17,7 @@ interface ApiService {
         @Body request: RegisterRequest
     ): Response<UserResponse>
 
-    // 로그인 (이게 있으니까 AuthApi가 필요 없어!)
+    // 로그인
     @POST("users/login")
     suspend fun login(
         @Body request: LoginRequest
@@ -67,13 +70,6 @@ interface ApiService {
         @Body request: UpdateDiaryContentRequest
     ): Response<DailyDiaryResponse>
 
-    // 하루 일기 재생성 API (PUT 방식)
-    @PUT("daily-diaries/{date_str}/regenerate")
-    suspend fun regenerateDailyDiary(
-        @Path("date_str") dateStr: String,
-        @Header("Authorization") token: String
-    ): Response<DailyDiaryResponse>
-
 
     // 일기 삭제
     @DELETE("diaries/{diary_id}")
@@ -116,6 +112,19 @@ interface ApiService {
         @Header("Authorization") token: String
     ): Response<MonthlyReportResponse>
 
+
+    @GET("/cv/monthly") 
+    suspend fun getCvMonthlySummary(
+        @Query("target_month") targetMonth: String,
+        @Header("Authorization") token: String  
+    ): Response<CVMonthlySummaryResponse>
+
+
+    @PUT("/daily-diaries/{date_str}/regenerate")
+    suspend fun regenerateDailyDiary(
+        @Path("date_str") dateStr: String, 
+        @Header("Authorization") token: String
+    ): Response<DailyDiaryResponse>
 
 }
 
