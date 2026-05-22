@@ -10,7 +10,6 @@ data class LoginRequest(
 )
 
 // 2. 로그인 응답 (백엔드 user.py 참고: Token 모델)
-// user_id가 없고 access_token만 옴 -> 나중에 토큰에서 id 추출해야 함
 data class LoginResponse(
     val access_token: String,
     val token_type: String
@@ -60,7 +59,11 @@ data class DailyDiaryResponse(
     val content: String,
     val source_count: Int,
     val created_at: String,
-    val updated_at: String
+    val updated_at: String,
+    val is_outdated: Boolean = false,
+    val can_regenerate: Boolean = false,
+    val current_source_count: Int = 0,
+    val outdated_reason: String? = null
 )
 
 // 하루 일기 수정 요청
@@ -105,7 +108,11 @@ data class MonthlyReportResponse(
     val keyword_annotations: Map<String, List<KeywordAnnotation>>?,
     val keyword_photo_index: Map<String, KeywordInfo>?,
     val photo_library: List<PhotoInfo>?,
-    val generated_at: String?
+    val generated_at: String?,
+    val report_month: String? = null,
+    val favorite_objects: List<CvObjectItem>? = null,
+    val emotions_summary: List<CvEmotionItem>? = null,
+    val highlight_places: List<CvPlaceItem>? = null
 )
 
 // 상태 확인 API의 응답 데이터 클래스
@@ -148,4 +155,42 @@ data class PhotoInfo(
     val image_url: String,
     val full_image_url: String,
     val content: String
+)
+
+data class CVMonthlySummaryResponse(
+    val report_month: String? = null,
+    val favorite_objects: List<CvObjectItem>? = null,
+    val emotions_summary: List<CvEmotionItem>? = null,
+    val highlight_places: List<CvPlaceItem>? = null
+)
+
+data class CvPhotoItem(
+    val image_url: String
+)
+
+data class CvObjectItem(
+    val rank: Int,
+    val category: String?,
+    val category_kr: String?,
+    val photo_count: Int,
+    val photo_items: List<CvPhotoItem>?
+)
+
+data class CvEmotionItem(
+    val emotion_en: String?,
+    val emotion_kr: String?,
+    val ratio: Double,
+    val best_cut: CvBestCut?
+)
+
+data class CvBestCut(
+    val image_url: String 
+)
+
+data class CvPlaceItem(
+    val rank: Int,
+    val place_key: String?,
+    val place_label: String?,
+    val photo_count: Int,
+    val photo_items: List<CvPhotoItem>? 
 )
