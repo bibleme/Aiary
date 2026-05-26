@@ -1,9 +1,11 @@
 package com.example.aiary
 
 import android.os.Build
+import android.util.Log
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -25,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -32,16 +35,14 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import com.example.aiary.data.CVMonthlySummaryResponse
 import com.example.aiary.data.KeywordAnnotation
 import com.example.aiary.data.MonthlyReportResponse
 import kotlin.math.absoluteValue
-import androidx.compose.foundation.clickable
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import android.util.Log
-import com.example.aiary.data.CVMonthlySummaryResponse
-import androidx.compose.ui.res.painterResource
+import androidx.compose.material3.MaterialTheme
 
 val BackgroundBlueGray = Color(0xFFF4F7FC)
 val KeywordBlue = Color(0xFF4A90E2)
@@ -141,13 +142,12 @@ fun BookStoryScreen(
             KeywordPhotoDialog(
                 keyword = selectedKeywordAnn!!.keyword,
                 photoUrls = selectedKeywordAnn!!.photos.map { photoInfo ->
-                    val url = photoInfo.full_image_url // (또는 photoInfo.image_url)
+                    val url = photoInfo.full_image_url
 
                     if (url.startsWith("http")) {
-                        url // 이미 풀 주소면 그대로 사용
+                        url
                     } else {
                         val baseUrl = "http://3.35.185.251:8000"
-                        // 슬래시(/)가 겹치지 않게 안전하게 조립
                         if (url.startsWith("/")) {
                             "$baseUrl$url"
                         } else {
@@ -228,18 +228,16 @@ fun ReportSection(title: String, fullText: String, annotations: List<KeywordAnno
 
         ClickableText(
             text = annotatedString,
-            style = LocalTextStyle.current.copy(color = Color.DarkGray, fontSize = 15.sp, lineHeight = 24.sp),
+            style = MaterialTheme.typography.bodyMedium.copy(color = Color.DarkGray, fontSize = 15.sp, lineHeight = 24.sp),
             onClick = { offset ->
                 annotatedString.getStringAnnotations("KEYWORD", offset, offset).firstOrNull()?.let { stringAnn ->
                     sortedAnnotations.find { it.keyword == stringAnn.item }?.let { onKeywordClick(it) }
                 }
             }
-        )
-    }
+        )}
 }
 
-// 📊 [화면 2] 데이터 리포트 (S3 URL 파싱 구조 반영)
-
+// 📊 [화면 2] 데이터 리포트 (새로운 감정 시각화 아키텍처 반영)
 @Composable
 fun DataReportPage(cvData: CVMonthlySummaryResponse?) {
     if (cvData == null) return
@@ -247,10 +245,6 @@ fun DataReportPage(cvData: CVMonthlySummaryResponse?) {
     val objectPhotos = cvData.favorite_objects
         ?.flatMap { it.photo_items ?: emptyList() }
         ?.map { it.image_url }
-        ?.distinct() ?: emptyList()
-
-    val emotionPhotos = cvData.emotions_summary
-        ?.mapNotNull { it.best_cut?.image_url }
         ?.distinct() ?: emptyList()
 
     val placePhotos = cvData.highlight_places
@@ -274,12 +268,15 @@ fun DataReportPage(cvData: CVMonthlySummaryResponse?) {
             modifier = Modifier.padding(bottom = 20.dp)
         )
 
+        // 1. 이달의 물건 
         DataCard("📦 이달의 물건", objectPhotos)
         Spacer(modifier = Modifier.height(16.dp))
 
-        DataCard("🏃 이달의 감정", emotionPhotos)
+        // 2. 이달의 감정 
+        EmotionReportCard(emotionsSummary = cvData.emotions_summary)
         Spacer(modifier = Modifier.height(16.dp))
 
+        // 3. 이달의 장소 
         DataCard("🏕️ 이달의 장소", placePhotos)
         Spacer(modifier = Modifier.height(40.dp))
     }
@@ -405,5 +402,126 @@ fun FullScreenImageDialog(
                 )
             }
         }
+    }
+}
+
+
+@Composable
+fun EmotionReportCard(
+    emotionsSummary: List<com.example.aiary.data.CvEmotionItem>?,
+    modifier: Modifier = Modifier
+) {
+    var selectedImageUrl by remember { mutableStateOf<String?>(null) }
+
+    Card(
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = CardBackground),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(
+                text = "🏃 이달의 감정",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = TextDarkGray,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            // 1. [기존 Empty 상황 우회] 데이터가 아예 없거나 빈 배열인 경우
+            if (emotionsSummary.isNullOrEmpty()) {
+                Text(
+                    text = "이번 달은 다양한 표정으로 마음을 전했어요 ✨",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.DarkGray,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(150.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFF0F0F0)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "아이의 감정 분석 사진이 부족해요 텅~", color = Color.Gray, fontSize = 14.sp)
+                }
+
+            } else {
+                // 2.[정상 상황] 백엔드로부터 감정 사진 데이터가 정상적으로 들어온 경우
+                // 기존 기획대로 1위 감정 정보와 함께 S3에서 온 실제 베스트 컷 사진을 띄웁니다
+                val rank1 = emotionsSummary[0]
+                val (rank1Text, rank1Emoji) = getEmotionScript(rank1.emotion_en ?: "")
+
+                Text(
+                    text = "이번 달은 $rank1Text $rank1Emoji",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color.DarkGray,
+                    modifier = Modifier.padding(bottom = 12.dp)
+                )
+
+                rank1.best_cut?.image_url?.let { url ->
+                    AsyncImage(
+                        model = url,
+                        contentDescription = "Emotion Best Cut",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.LightGray)
+                            .clickable { selectedImageUrl = url },
+                        error = painterResource(id = android.R.drawable.ic_menu_report_image),
+                        placeholder = painterResource(id = android.R.drawable.ic_menu_gallery)
+                    )
+                }
+
+
+                if (emotionsSummary.size > 1) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    val rank2 = emotionsSummary[1]
+                    val (rank2Text, rank2Emoji) = getEmotionScript(rank2.emotion_en ?: "")
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(KeywordBlue.copy(alpha = 0.08f))
+                            .padding(horizontal = 12.dp, vertical = 10.dp)
+                    ) {
+                        Text(
+                            text = "💡 사실 종종 $rank2Text $rank2Emoji",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = KeywordBlue
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    selectedImageUrl?.let { url ->
+        FullScreenImageDialog(
+            imageUrl = url,
+            onDismiss = { selectedImageUrl = null }
+        )
+    }
+}
+
+/**
+ * 백엔드 영문 키워드를 매핑하는 딕셔너리 유틸 함수
+ */
+fun getEmotionScript(emotionEn: String): Pair<String, String> {
+    return when (emotionEn.lowercase()) {
+        "happy" -> Pair("밝은 표정이 많이 보였어요", "🙂")
+        "angry" -> Pair("진지한 표정도 보였어요", "😎")
+        "sad" -> Pair("시무룩한 감정을 표현하기도 했어요", "😢")
+        "surprise" -> Pair("깜짝 놀란 눈으로 세상을 탐색했어요", "😮")
+        "fear" -> Pair("조금은 조심스러운 순간을 마주하기도 했어요", "🥺")
+        else -> Pair("다양한 표정으로 마음을 전했어요", "✨")
     }
 }
