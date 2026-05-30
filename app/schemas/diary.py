@@ -40,6 +40,18 @@ class DailyDiaryResponse(BaseModel):
     generation_meta: Optional[Any] = None
 
     source_count: int
+    
+    source_hash: Optional[str] = None
+    last_source_created_at: Optional[datetime.datetime] = None
+
+    current_source_count: Optional[int] = None
+    current_source_hash: Optional[str] = None
+
+    is_outdated: bool = False
+    outdated_reason: Optional[str] = None
+
+    can_regenerate: bool = True
+    
     created_at: datetime.datetime
     updated_at: datetime.datetime
     edited_at: Optional[datetime.datetime] = None

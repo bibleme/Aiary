@@ -1,4 +1,5 @@
 # app/api/endpoints/diary.py
+import hashlib
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -9,6 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.crud import get_or_create_vision_image
 from app.db.database import get_db_session
 from app.db.model import Diary, DailyDiary, User
 from app.schemas.diary import (
@@ -20,6 +22,7 @@ from app.services.ai_generator import generate_one_line_diary
 from app.services.daily_diary_generator import generate_daily_diary
 from app.services.security import get_current_user
 from app.config import settings
+from app.services.storage import save_uploaded_image, generate_presigned_image_url
 
 router = APIRouter(tags=["diaries"])
 
@@ -54,16 +57,73 @@ def _generate_filename(original_name: str) -> str:
     uid = uuid4().hex[:8]
     return f"{ts}_{uid}{ext}"
 
+def _compute_daily_source_snapshot(diaries: list[Diary]) -> dict:
+    hasher = hashlib.sha256()
+
+    for diary in diaries:
+        hasher.update(
+            (
+                f"{diary.id}|"
+                f"{diary.diary_date}|"
+                f"{diary.created_at.isoformat() if diary.created_at else ''}|"
+                f"{diary.content}|"
+                f"{diary.image_url}"
+            ).encode("utf-8")
+        )
+
+    return {
+        "source_count": len(diaries),
+        "source_hash": hasher.hexdigest() if diaries else "",
+        "last_source_created_at": diaries[-1].created_at if diaries else None,
+    }
+
+
+def _build_daily_outdated_info(
+    daily_diary: DailyDiary,
+    current_snapshot: dict,
+) -> dict:
+    stored_hash = daily_diary.source_hash or ""
+    current_hash = current_snapshot["source_hash"]
+
+    if not stored_hash:
+        return {
+            "is_outdated": True,
+            "outdated_reason": "source snapshot missing",
+        }
+
+    if daily_diary.source_count != current_snapshot["source_count"]:
+        return {
+            "is_outdated": True,
+            "outdated_reason": "source count changed",
+        }
+
+    if stored_hash != current_hash:
+        return {
+            "is_outdated": True,
+            "outdated_reason": "source content changed",
+        }
+
+    return {
+        "is_outdated": False,
+        "outdated_reason": None,
+    }
+
 
 def _serialize_diary(diary: Diary) -> dict:
+    image_url = generate_presigned_image_url(
+        image_storage=getattr(diary, "image_storage", None),
+        image_key=getattr(diary, "image_key", None),
+        image_url=diary.image_url,
+    )
     return {
         "id": diary.id,
         "user_id": diary.user_id,
         "content": diary.content,
-        "image_url": diary.image_url,
+        "image_url": image_url,
         "diary_date": diary.diary_date,
         "created_at": diary.created_at,
     }
+
 
 def _resolve_generated_content(daily_diary: DailyDiary) -> str:
     return daily_diary.generated_content or daily_diary.content or ""
@@ -73,21 +133,39 @@ def _resolve_final_content(daily_diary: DailyDiary) -> str:
     return daily_diary.edited_content or daily_diary.generated_content or daily_diary.content or ""
 
 
-def _serialize_daily_diary(daily_diary: DailyDiary) -> dict:
+def _serialize_daily_diary(
+    daily_diary: DailyDiary,
+    current_snapshot: Optional[dict] = None,
+) -> dict:
     generated_content = _resolve_generated_content(daily_diary)
     final_content = _resolve_final_content(daily_diary)
+
+    outdated_info = {
+        "is_outdated": False,
+        "outdated_reason": None,
+    }
+
+    if current_snapshot is not None:
+        outdated_info = _build_daily_outdated_info(daily_diary, current_snapshot)
 
     return {
         "id": daily_diary.id,
         "user_id": daily_diary.user_id,
         "diary_date": daily_diary.diary_date,
-        "content": final_content,  # 하위호환용
+        "content": final_content,
         "generated_content": generated_content,
         "edited_content": daily_diary.edited_content,
         "final_content": final_content,
         "model_version": daily_diary.model_version,
         "generation_meta": daily_diary.generation_meta,
         "source_count": daily_diary.source_count,
+        "source_hash": daily_diary.source_hash,
+        "last_source_created_at": daily_diary.last_source_created_at,
+        "current_source_count": current_snapshot["source_count"] if current_snapshot else daily_diary.source_count,
+        "current_source_hash": current_snapshot["source_hash"] if current_snapshot else daily_diary.source_hash,
+        "is_outdated": outdated_info["is_outdated"],
+        "outdated_reason": outdated_info["outdated_reason"],
+        "can_regenerate": True,
         "created_at": daily_diary.created_at,
         "updated_at": daily_diary.updated_at,
         "edited_at": daily_diary.edited_at,
@@ -143,23 +221,29 @@ async def create_diary(
 
         one_line = await generate_one_line_diary(image_bytes, GPT_USER_PROMPT)
 
-        filename = _generate_filename(photo.filename or "image.jpg")
-        file_path = IMAGES_DIR / filename
-        with open(file_path, "wb") as f:
-            f.write(image_bytes)
-
-        image_url = f"/media/images/{filename}"
+        storage_result = save_uploaded_image(
+            image_bytes=image_bytes,
+            user_id=current_user.id,
+            original_filename=photo.filename or "image.jpg",
+            content_type=photo.content_type,
+            diary_date=diary_date,
+        )
 
         new_diary = Diary(
             user_id=current_user.id,
             content=one_line,
-            image_url=image_url,
+            image_url=storage_result["image_url"],
+            image_storage=storage_result["image_storage"],
+            image_key=storage_result["image_key"],
+            image_filename=storage_result["image_filename"],
             diary_date=diary_date,
         )
 
         db.add(new_diary)
         await db.commit()
         await db.refresh(new_diary)
+        
+        await get_or_create_vision_image(db, new_diary)
 
         return _serialize_diary(new_diary)
 
@@ -274,7 +358,9 @@ async def create_daily_diary(
 
         existing = await _get_daily_diary(db, current_user.id, target_date)
         if existing:
-            return _serialize_daily_diary(existing)
+            diaries = await _get_one_line_diaries_for_date(db, current_user.id, target_date)
+            snapshot = _compute_daily_source_snapshot(diaries)
+            return _serialize_daily_diary(existing, snapshot)
 
         diaries = await _get_one_line_diaries_for_date(db, current_user.id, target_date)
         if not diaries:
@@ -284,6 +370,7 @@ async def create_daily_diary(
             )
 
         one_lines = [diary.content for diary in diaries]
+        snapshot = _compute_daily_source_snapshot(diaries)
 
         gen_result = await generate_daily_diary(one_lines)
         full_diary = gen_result["generated_diary"]
@@ -304,19 +391,21 @@ async def create_daily_diary(
             generated_content=full_diary,
             edited_content=None,
             model_version=gen_result.get("model_version"),
-            generation_meta={
+            generation_meta=gen_result.get("generation_meta") or {
                 "one_lines_count": gen_result.get("one_lines_count"),
                 "bullet_lines": gen_result.get("bullet_lines"),
                 "combined_summary": gen_result.get("combined_summary"),
             },
-            source_count=len(one_lines),
+            source_count=snapshot["source_count"],
+            source_hash=snapshot["source_hash"],
+            last_source_created_at=snapshot["last_source_created_at"],
         )
 
         db.add(new_daily_diary)
         await db.commit()
         await db.refresh(new_daily_diary)
 
-        return _serialize_daily_diary(new_daily_diary)
+        return _serialize_daily_diary(new_daily_diary, snapshot)
 
     except HTTPException:
         raise
@@ -342,8 +431,10 @@ async def get_daily_diary(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="해당 날짜의 하루일기가 아직 생성되지 않았습니다.",
             )
+        diaries = await _get_one_line_diaries_for_date(db, current_user.id, target_date)
+        snapshot = _compute_daily_source_snapshot(diaries)
 
-        return _serialize_daily_diary(existing)
+        return _serialize_daily_diary(existing, snapshot)
 
     except HTTPException:
         raise
@@ -410,7 +501,8 @@ async def regenerate_daily_diary(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="해당 날짜에 한줄일기가 없습니다.",
             )
-
+            
+        snapshot = _compute_daily_source_snapshot(diaries)
         one_lines = [diary.content for diary in diaries]
 
         gen_result = await generate_daily_diary(one_lines)
@@ -430,17 +522,19 @@ async def regenerate_daily_diary(
             existing.content = full_diary  # 임시 호환용
             existing.generated_content = full_diary
             existing.model_version = gen_result.get("model_version")
-            existing.generation_meta = {
+            existing.generation_meta = gen_result.get("generation_meta") or {
                 "one_lines_count": gen_result.get("one_lines_count"),
                 "bullet_lines": gen_result.get("bullet_lines"),
                 "combined_summary": gen_result.get("combined_summary"),
             }
-            existing.source_count = len(one_lines)
+            existing.source_count = snapshot["source_count"]
+            existing.source_hash = snapshot["source_hash"]
+            existing.last_source_created_at = snapshot["last_source_created_at"]
 
             # edited_content / edited_at 은 유지
             await db.commit()
             await db.refresh(existing)
-            return _serialize_daily_diary(existing)
+            return _serialize_daily_diary(existing, snapshot)
 
         new_daily_diary = DailyDiary(
             user_id=current_user.id,
@@ -449,18 +543,20 @@ async def regenerate_daily_diary(
             generated_content=full_diary,
             edited_content=None,
             model_version=gen_result.get("model_version"),
-            generation_meta={
+            generation_meta=gen_result.get("generation_meta") or {
                 "one_lines_count": gen_result.get("one_lines_count"),
                 "bullet_lines": gen_result.get("bullet_lines"),
                 "combined_summary": gen_result.get("combined_summary"),
             },
-            source_count=len(one_lines),
+            source_count=snapshot["source_count"],
+            source_hash=snapshot["source_hash"],
+            last_source_created_at=snapshot["last_source_created_at"],
         )
         db.add(new_daily_diary)
         await db.commit()
         await db.refresh(new_daily_diary)
 
-        return _serialize_daily_diary(new_daily_diary)
+        return _serialize_daily_diary(new_daily_diary, snapshot)
 
     except HTTPException:
         raise

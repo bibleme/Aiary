@@ -61,6 +61,9 @@ class Diary(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     content = Column(Text, nullable=False)
     image_url = Column(String, nullable=False)
+    image_storage = Column(String(20), nullable=False, default="local")
+    image_key = Column(Text, nullable=True)
+    image_filename = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False, index=True)
     diary_date = Column(Date, nullable=False, default=datetime.date.today, index=True)
 
@@ -90,6 +93,8 @@ class DailyDiary(Base):
     model_version = Column(String, nullable=True)
     generation_meta = Column(JSON, nullable=True)
     source_count = Column(Integer, nullable=False, default=0)
+    source_hash = Column(String(64), nullable=False, default="")
+    last_source_created_at = Column(DateTime, nullable=True)
 
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
     updated_at = Column(
@@ -153,6 +158,17 @@ class VisionImage(Base):
     file_name = Column(String, nullable=False)
     image_url = Column(String, nullable=False)
     year_month = Column(String(7), nullable=False, index=True)
+    
+    image_storage = Column(String(20), nullable=False, default="local")
+    image_key = Column(Text, nullable=True)
+    image_filename = Column(String, nullable=True)
+
+    basic_cv_status = Column(String(20), nullable=False, default="pending", index=True)
+    face_cv_status = Column(String(20), nullable=False, default="pending", index=True)
+    basic_cv_attempts = Column(Integer, nullable=False, default=0)
+    face_cv_attempts = Column(Integer, nullable=False, default=0)
+    locked_at = Column(DateTime, nullable=True)
+    last_error = Column(Text, nullable=True)
 
     cv_status = Column(String(20), nullable=False, default="pending", index=True)
     error_message = Column(Text, nullable=True)

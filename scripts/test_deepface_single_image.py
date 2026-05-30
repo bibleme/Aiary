@@ -13,7 +13,7 @@ def main():
         id=0,
         user_id=15,
         content="",
-        image_url="/media/images/20260411_155450_ec9cd30e.JPG",
+        image_url="/media/images/20260411_124739_5c7ca2ab.jpg",
     )
 
     image_path = resolve_local_image_path(diary.image_url)

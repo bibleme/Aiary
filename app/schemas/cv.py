@@ -1,7 +1,7 @@
 # app/schemas/cv.py
 
 from datetime import datetime
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Any
 from pydantic import BaseModel, Field
 
 
@@ -64,6 +64,56 @@ class CVProcessResponse(BaseModel):
     cv_status: Literal["pending", "done", "failed"]
     message: str
 
+class CVPhotoItem(BaseModel):
+    diary_id: Optional[int] = None
+    vision_image_id: Optional[int] = None
+    date: Optional[str] = None
+    file_name: Optional[str] = None
+    image_url: Optional[str] = None
+    bbox: Optional[list[float]] = None
+    confidence: Optional[float] = None
+
+
+class CVFavoriteObject(BaseModel):
+    rank: int
+    category: str
+    category_kr: str
+    is_new: bool
+    photo_count: int
+    photos: list[str] = []
+    photo_items: list[CVPhotoItem] = []
+    appearances: list[CVPhotoItem] = []
+
+
+class CVEmotionSummary(BaseModel):
+    emotion_en: str
+    emotion_kr: str
+    ratio: float
+    best_cut: CVPhotoItem
+
+
+class CVHighlightPlace(BaseModel):
+    rank: int
+    place_key: str
+    place_label: str
+    is_new: bool
+    photo_count: int
+    photos: list[str] = []
+    photo_items: list[CVPhotoItem] = []
+
+
+class CVEmotionBasis(BaseModel):
+    description: str
+    analyzed_face_count: int
+    is_reference_only: bool
+
+
+class CVMonthlySummaryResponse(BaseModel):
+    report_month: str
+    favorite_objects: list[CVFavoriteObject] = []
+    emotions_summary: list[CVEmotionSummary] = []
+    highlight_places: list[CVHighlightPlace] = []
+    emotion_basis: Optional[CVEmotionBasis] = None
 
 class AppearanceIn(BaseModel):
     entity_type: Literal["person", "object"]
@@ -104,3 +154,4 @@ class CVIngestRequest(BaseModel):
     persons: List[PersonIn] = Field(default_factory=list)
     objects: List[ObjectIn] = Field(default_factory=list)
     interactions: List[InteractionIn] = Field(default_factory=list)
+    

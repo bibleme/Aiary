@@ -11,8 +11,11 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from copy import deepcopy
+from app.services.storage import generate_presigned_image_url
 from app.config import settings
 from app.db.model import Diary, MonthlyReport
+from app.services.cv_monthly_summary import generate_cv_monthly_summary
 
 logger = logging.getLogger(__name__)
 
@@ -358,16 +361,76 @@ def _load_scene_cache(user_id: int, target_month: str) -> dict[int, dict]:
 
     return scene_map
 
+def _build_diary_presigned_url(diary: Diary) -> Optional[str]:
+    return generate_presigned_image_url(
+        image_storage=getattr(diary, "image_storage", None),
+        image_key=getattr(diary, "image_key", None),
+        image_url=getattr(diary, "image_url", None),
+    )
+
+async def refresh_monthly_report_image_urls(
+    db: AsyncSession,
+    user_id: int,
+    report: dict,
+) -> dict:
+    refreshed = deepcopy(report)
+    diary_ids = set()
+    def collect_ids(node):
+        if isinstance(node, dict):
+            if node.get("diary_id") is not None:
+                diary_ids.add(int(node["diary_id"]))
+            if node.get("source_diary_id") is not None:
+                diary_ids.add(int(node["source_diary_id"]))
+            for value in node.values():
+                collect_ids(value)
+        elif isinstance(node, list):
+            for item in node:
+                collect_ids(item)
+    collect_ids(refreshed)
+    if not diary_ids:
+        return refreshed
+    result = await db.execute(
+        select(Diary).where(
+            Diary.user_id == user_id,
+            Diary.id.in_(diary_ids),
+        )
+    )
+    diaries = list(result.scalars().all())
+    url_by_diary_id = {
+        diary.id: _build_diary_presigned_url(diary)
+        for diary in diaries
+    }
+    def apply_urls(node):
+        if isinstance(node, dict):
+            diary_id = node.get("diary_id") or node.get("source_diary_id")
+            if diary_id is not None:
+                signed_url = url_by_diary_id.get(int(diary_id))
+                if signed_url:
+                    if "image_url" in node:
+                        node["image_url"] = signed_url
+                    if "full_image_url" in node:
+                        node["full_image_url"] = signed_url
+                    if "source_image_url" in node:
+                        node["source_image_url"] = signed_url
+                    if "source_full_image_url" in node:
+                        node["source_full_image_url"] = signed_url
+            for value in node.values():
+                apply_urls(value)
+        elif isinstance(node, list):
+            for item in node:
+                apply_urls(item)
+    apply_urls(refreshed)
+    return refreshed
 
 def _build_photo_ref(diary: Diary) -> dict:
+    signed_url = _build_diary_presigned_url(diary)
     return {
         "diary_id": diary.id,
         "date": str(diary.diary_date),
-        "image_url": diary.image_url,
-        "full_image_url": build_full_image_url(diary.image_url),
+        "image_url": signed_url,
+        "full_image_url": signed_url,
         "content": diary.content,
     }
-
 
 def rule_based_scene_extract_row(diary: Diary, target_month: str) -> List[Dict[str, Any]]:
     prep = preprocess_diary(diary.content)
@@ -999,8 +1062,11 @@ async def generate_monthly_report_payload(
     else:
         report = make_rule_based_month_report(target_month, month_stat, highlights)
 
+        
     report["user_id"] = user_id
     report["generated_at"] = datetime.now(UTC).isoformat()
+
+
 
     snapshot = {
         "source_diary_count": len(diaries),

@@ -21,11 +21,6 @@ def get_device():
 
 
 def _load_yolo_trusted(weights_path: str):
-    """
-    PyTorch 2.6+에서 torch.load 기본 weights_only=True 때문에
-    Ultralytics YOLO 체크포인트 로딩이 막히는 문제를 피하기 위해,
-    신뢰 가능한 공식 weight 파일에 한해서만 weights_only=False로 강제한다.
-    """
     from ultralytics import YOLO
 
     original_torch_load = torch.load
@@ -45,6 +40,7 @@ def _load_yolo_trusted(weights_path: str):
 
 def load_cv_models() -> dict[str, Any]:
     global _MODELS
+
     if _MODELS is not None:
         return _MODELS
 
@@ -53,20 +49,30 @@ def load_cv_models() -> dict[str, Any]:
     os.environ.setdefault("DEEPFACE_HOME", str(Path(settings.CV_CACHE_ROOT) / "deepface"))
 
     import clip
-    from transformers import AutoProcessor, AutoModel
 
     device = get_device()
 
-    # YOLO 공식 weight 파일 로드
-    yolo_obj = _load_yolo_trusted(settings.CV_YOLO_OBJECT_MODEL)
-    yolo_pose = _load_yolo_trusted(settings.CV_YOLO_POSE_MODEL)
+    print("[CV] loading models...", flush=True)
+    print(f"[CV] device={device}", flush=True)
+    print(f"[CV] load_pose={settings.CV_LOAD_POSE_MODEL}", flush=True)
+    print(f"[CV] use_siglip={settings.CV_USE_SIGLIP_EMBEDDINGS}", flush=True)
 
-    # CLIP 로드
+    yolo_obj = _load_yolo_trusted(settings.CV_YOLO_OBJECT_MODEL)
+
+    yolo_pose = None
+    if settings.CV_LOAD_POSE_MODEL:
+        yolo_pose = _load_yolo_trusted(settings.CV_YOLO_POSE_MODEL)
+
     clip_model, clip_preprocess = clip.load(settings.CV_CLIP_MODEL_NAME, device=device)
 
-    # SigLIP 로드
-    siglip_processor = AutoProcessor.from_pretrained(settings.CV_SIGLIP_MODEL_NAME)
-    siglip_model = AutoModel.from_pretrained(settings.CV_SIGLIP_MODEL_NAME).to(device)
+    siglip_processor = None
+    siglip_model = None
+    if settings.CV_USE_SIGLIP_EMBEDDINGS:
+        from transformers import AutoProcessor, AutoModel
+
+        siglip_processor = AutoProcessor.from_pretrained(settings.CV_SIGLIP_MODEL_NAME)
+        siglip_model = AutoModel.from_pretrained(settings.CV_SIGLIP_MODEL_NAME).to(device)
+        siglip_model.eval()
 
     prompts = [
         "a photo of a residential home interior or living room",
@@ -105,6 +111,7 @@ def load_cv_models() -> dict[str, Any]:
     }
 
     tokens = clip.tokenize(prompts).to(device)
+
     with torch.no_grad():
         text_features = clip_model.encode_text(tokens)
         text_features = text_features / text_features.norm(dim=-1, keepdim=True)
@@ -121,4 +128,6 @@ def load_cv_models() -> dict[str, Any]:
         "prompt_to_tag": prompt_to_tag,
         "text_features": text_features,
     }
+
+    print("[CV] models loaded", flush=True)
     return _MODELS
