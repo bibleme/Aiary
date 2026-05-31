@@ -1,90 +1,50 @@
-# =========================================================
-# Virtual Environment
-# =========================================================
-# 가상 환경 폴더는 용량이 크고 OS마다 다르므로 무시
+# Python
 venv/
-
-# =========================================================
-# Python / Cache Artifacts
-# =========================================================
-# 컴파일된 파이썬 파일 및 캐시 무시
+.venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 .pytest_cache/
-
-# =========================================================
-# OS / IDE Artifacts
-# =========================================================
+# OS / IDE
 .DS_Store
 .vscode/
-
-# =========================================================
-# Environment / Configuration
-# =========================================================
-# 민감 정보 파일 무시 (절대 필수)
+.idea/
+# Environment
 .env
-.env.local
-
-# =========================================================
+.env.*
+!.env.example
 # Logs
-# =========================================================
+logs/
 *.log
 nohup.out
 uvicorn.log
 server.log
-
-# =========================================================
-# Database Files
-# =========================================================
-# SQLite DB 파일 사용 시 무시
+# Database / Backup
 *.sqlite
-
-# =========================================================
-# Uploaded / Generated Media
-# =========================================================
-# 로컬 업로드 이미지 및 생성 파일 무시
-/uploads/
-media/images/
+*.db
+*.sql
+backups/
+backup_*/
+app.integrate_root_backup_*/
+media_backup_*/
+# Runtime media
+media/
+uploads/
 one_lines/
-
-# =========================================================
-# Private Keys / Sensitive Files
-# =========================================================
-Aiary.pem
-new_aiary_key
-new_aiary_key.pub
-
-# =========================================================
-# ML Model Weights (Too Large for GitHub)
-# =========================================================
-models/day_diary_from_summary_v2/
-
+# ML models / weights
+models/
 *.safetensors
 *.pt
 *.bin
 *.ckpt
-
-
-# =========================================================
-# Additional Runtime / Backup / Docker Local Files
-# =========================================================
-.env.*
-!.env.example
-
-media/
-media_backup_*/
-models/
-home/
-backups/
-backup_*/
-app.integrate_root_backup_*/
-
-.env.docker
-docker-compose.yml
-
 *.h5
-*.onnx
-*.pth
-*.sql
-*.db
-EOF
+# Private keys
+*.pem
+new_aiary_key
+new_aiary_key.pub
+Aiary.pem
+# Docker local
+postgres_data/
+# Node
+node_modules/

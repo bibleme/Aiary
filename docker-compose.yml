@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: aiary-backend-test
+    container_name: aiary-backend-docker
     restart: unless-stopped
     network_mode: host
     env_file:
