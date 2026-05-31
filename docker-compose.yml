@@ -1,0 +1,14 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aiary-backend-test
+    restart: unless-stopped
+    network_mode: host
+    env_file:
+      - .env.docker
+    volumes:
+      - /home/ubuntu/Aiary/models:/home/ubuntu/Aiary/models:ro
+      - /home/ubuntu/Aiary/media:/home/ubuntu/Aiary/media
+      - /home/ubuntu/aiary-assets:/home/ubuntu/aiary-assets
