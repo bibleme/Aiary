@@ -1,6 +1,5 @@
 package com.example.aiary.data
 
-import javax.annotation.processing.Generated
 import com.google.gson.annotations.SerializedName
 
 // 1. 로그인 요청
@@ -9,7 +8,7 @@ data class LoginRequest(
     val password: String
 )
 
-// 2. 로그인 응답 (백엔드 user.py 참고: Token 모델)
+// 2. 로그인 응답
 data class LoginResponse(
     val access_token: String,
     val token_type: String
@@ -28,8 +27,7 @@ data class UserResponse(
     val created_at: String
 )
 
-// 5. 일기 생성 응답 (백엔드 diary.py: create_diary 반환값 참고)
-// { "status": "success", "diary": { ... } } 형태임
+// 5. 일기 생성 응답
 data class CreateDiaryResponse(
     val status: String,
     val diary: DiaryData
@@ -50,8 +48,6 @@ data class DaySummaryRequest(
     val date: String // "YYYY-MM-DD"
 )
 
-
-
 data class DailyDiaryResponse(
     val id: Int,
     val user_id: Int,
@@ -71,13 +67,11 @@ data class UpdateDiaryContentRequest(
     val content: String
 )
 
-
 // 비밀번호 변경 요청
 data class ChangePasswordRequest(
     val old_password: String,
     val new_password: String
 )
-
 
 data class DiaryResponse(
     val id: Int,
@@ -85,7 +79,6 @@ data class DiaryResponse(
     val content: String,
     val image_url: String,
     val created_at: String,
-
     @SerializedName("diary_date")
     val diary_date: String? = null
 )
@@ -128,7 +121,7 @@ data class MonthlyReportStatusResponse(
     val reason: String?
 )
 
-// 에러 처리용 (일기 5개 미만 등)
+// 에러 처리용
 data class ErrorResponse(
     val detail: String
 )
@@ -157,6 +150,7 @@ data class PhotoInfo(
     val content: String
 )
 
+// 백엔드 명세서 기반 CV 통계 데이터 모델
 data class CVMonthlySummaryResponse(
     val report_month: String? = null,
     val favorite_objects: List<CvObjectItem>? = null,
@@ -176,15 +170,8 @@ data class CvObjectItem(
     val photo_items: List<CvPhotoItem>?
 )
 
-data class CvEmotionItem(
-    val emotion_en: String?,
-    val emotion_kr: String?,
-    val ratio: Double,
-    val best_cut: CvBestCut?
-)
-
 data class CvBestCut(
-    val image_url: String 
+    val image_url: String
 )
 
 data class CvPlaceItem(
@@ -192,5 +179,13 @@ data class CvPlaceItem(
     val place_key: String?,
     val place_label: String?,
     val photo_count: Int,
-    val photo_items: List<CvPhotoItem>? 
+    val photo_items: List<CvPhotoItem>?
+)
+
+data class CvEmotionItem(
+    val emotion_en: String?,
+    val emotion_kr: String?,
+    val ratio: Double,
+    val photo_count: Int? = null,// 기존에 잘 작동하던 Double 타입 유지
+    val best_cut: CvBestCut?
 )
