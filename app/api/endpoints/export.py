@@ -19,8 +19,17 @@ from app.schemas.export import (
     UserDiariesResponse,
 )
 from app.services.security import get_current_user
+from app.services.storage import generate_presigned_image_url
 
 router = APIRouter(prefix="/exports", tags=["exports"])
+
+
+def _resolve_diary_image_url(diary: Diary) -> str:
+    return generate_presigned_image_url(
+        image_storage=getattr(diary, "image_storage", None),
+        image_key=getattr(diary, "image_key", None),
+        image_url=diary.image_url,
+    )
 
 
 @router.get("/monthly-diaries", response_model=MonthlyDiariesResponse)
@@ -30,10 +39,6 @@ async def get_monthly_diaries(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    로그인한 사용자의 특정 연/월(one-line + daily) 데이터를 날짜별로 묶어서 반환한다.
-    데이터가 없는 날짜도 month 전체 일자에 대해 모두 포함한다.
-    """
     try:
         start_date = date(year, month, 1)
         last_day = calendar.monthrange(year, month)[1]
@@ -79,7 +84,13 @@ async def get_monthly_diaries(
 
     for diary in one_line_diaries:
         days_map[diary.diary_date].one_line_diaries.append(
-            OneLineDiaryItem.model_validate(diary)
+            OneLineDiaryItem(
+                id=diary.id,
+                content=diary.content,
+                image_url=_resolve_diary_image_url(diary),
+                diary_date=diary.diary_date,
+                created_at=diary.created_at,
+            )
         )
 
     for daily in daily_diaries:
@@ -89,7 +100,7 @@ async def get_monthly_diaries(
         days_map[daily.diary_date].daily_diary = DailyDiaryItem(
             id=daily.id,
             diary_date=daily.diary_date,
-            content=final_content,  # 하위호환용
+            content=final_content,
             generated_content=generated_content,
             edited_content=daily.edited_content,
             final_content=final_content,
@@ -107,8 +118,8 @@ async def get_monthly_diaries(
         month=month,
         days=list(days_map.values()),
     )
-    
-    
+
+
 @router.get("/admin/one-line-list", response_model=list[UserDiariesResponse])
 async def get_all_users_diaries_for_admin(
     user_id: int | None = Query(
@@ -118,14 +129,6 @@ async def get_all_users_diaries_for_admin(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    내부/개발용:
-    전체 유저의 한줄일기를 user_id별로 묶어서 반환한다.
-    user_id가 주어지면 해당 유저의 한줄일기만 반환한다.
-
-    현재는 관리자 권한 필드가 없으므로, 인증 사용자만 접근 가능하게 두고
-    추후 admin role 도입 시 권한 제한을 강화한다.
-    """
     stmt = select(Diary)
 
     if user_id is not None:
@@ -143,7 +146,7 @@ async def get_all_users_diaries_for_admin(
             AdminOneLineDiaryItem(
                 id=diary.id,
                 content=diary.content,
-                image_url=diary.image_url,
+                image_url=_resolve_diary_image_url(diary),
                 diary_date=diary.diary_date,
                 created_at=diary.created_at,
             )
