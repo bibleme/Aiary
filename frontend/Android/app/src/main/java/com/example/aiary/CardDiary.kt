@@ -92,14 +92,9 @@ fun CardDiaryScreen(
                 }
 
                 diaryPhotos = filteredDiaries.map {
-                    val fixedUrl = if (it.image_url.startsWith("http")) {
-                        it.image_url
-                    } else {
-                        val baseUrl = "http://3.35.185.251:8000"
-                        "$baseUrl${it.image_url}"
-                    }
-                    // 서버에서 받아온 id를 함께 저장 
-                    DiaryPhoto(id = it.id, imageUrl = fixedUrl, comment = it.content)
+                    val finalUrl = it.image_url ?: ""
+                    Log.e("FINAL_URL_CHECK", "스웨거랑 똑같이 들어오는지 확인: $finalUrl")
+                    DiaryPhoto(id = it.id, imageUrl = finalUrl, comment = it.content ?: "")
                 }
 
                 if (filteredDiaries.isNotEmpty()) {
