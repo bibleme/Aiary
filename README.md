@@ -48,6 +48,13 @@ Aiary/
 | 월간 리포트 생성 | GPT + CV |
 
 ---
+### 🔎 **서비스 플로우**
+
+Step 1: 부모가 아이의 일상 사진(예: 놀이터에서 노는 모습)을 업로드
+Step 2: AI가 사진 속 상황(객체, 표정, 장소 등)을 분석해 다정한 말투의 한 줄 일기 자동 생성
+Step 3: 한 달간 쌓인 데이터를 종합해 아이의 성장 테마가 담긴 '스토리북(월간 리포트)' 제공
+
+---
 
 ### 🖥 **CV** 
 wiki page: https://github.com/bibleme/Aiary/wiki/CV
@@ -136,6 +143,15 @@ Android Studio → Open → frontend/Android
 
 ---
 
+## ✨ **프로젝트 기대 효과**
+
+* 기록 부담 감소
+* 의미 있는 성장 아카이브 구축
+* 개인화 된 육아 인사이트 제공
+* 실서비스형 AI 파이프라인 검증
+
+---
+
 ## 👥 **Contributors**
 
 | 역할       | 담당      |
@@ -143,7 +159,5 @@ Android Studio → Open → frontend/Android
 | 백엔드      | 윤수빈 , 임규민 |
 | 프론트엔드    | 도한비 |
 | AI Model | 류혁, 정성경 |
-
----
 
 
