@@ -82,7 +82,13 @@ graph LR
     B --> C[Self-training<br>Round2~Round5]
     C -->|Final realistic train 1,095 / eval 58| D[Realistic SFT]
 ```
-* 학습 데이터 구성 (Round 1~Round 5)
+* Correction-centered Training (반복을 통해 품질과 자연스러움 개선)
+```mermaid
+graph LR
+    A[Round n<br>KoBART] --> B[Draft Evaluator<br>품질 평가·오류 분류]
+    B --> C[GPT<br>Correction]
+    C --> D[Round n+1<br>KoBART]
+```
 * 월간 리포트 (GPT)
 
 ---
