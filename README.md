@@ -52,6 +52,8 @@ Aiary/
 ### 🖥 **CV** 
 wiki page: https://github.com/bibleme/Aiary/wiki/CV
 
+사용자가 업로드한 유아 사진에서 장면, 객체, 인물, 표정 기반 감정 추정 정보를 추출하고, 이를 월간 성장 리포트의 정량적 분석 근거로 제공
+
 * 한 줄 일기 생성 (GPT)
 * 하루 일기 생성 (KoBART)
 * CV 기반 구조화 데이터 생성 (CV 배치 워커 실행)
@@ -63,6 +65,8 @@ wiki page: https://github.com/bibleme/Aiary/wiki/CV
 ### 📱 **NLP**
 wiki page: https://github.com/bibleme/Aiary/wiki/NLP
 
+사용자가 업로드한 사진 정보를 자연스러운 육아 기록으로 변환하는 역할
+
 * 한 줄 일기 생성 (GPT-4.1-mini)
 * 하루 일기 생성 (fine-tuned KoBART)
 * 학습 데이터 구성 (Round 1~Round 5)
@@ -72,6 +76,9 @@ wiki page: https://github.com/bibleme/Aiary/wiki/NLP
 
 ### 🖥 **백엔드(FastAPI)**
 wiki page: https://github.com/bibleme/Aiary/wiki/Backend
+
+사용자 인증, 이미지 저장, AI 생성 결과 관리, 월별 리포트 생성, CV 분석 결과 저장, 자동화 작업 관리를 담당하며 전체 서비스의 데이터 흐름을 제어
+
 * 사진 업로드 API
 * 한 줄 일기 생성 API
 * 하루 줄글 일기 생성 API (GPT)
@@ -84,6 +91,8 @@ wiki page: https://github.com/bibleme/Aiary/wiki/Backend
 
 ### 📱 **프론트엔드(Android)**
 wiki page: https://github.com/bibleme/Aiary/wiki
+
+사용자가 아이 사진을 쉽게 업로드하고, AI가 생성한 일기와 월간 성장 리포트를 직관적으로 확인할 수 있도록 구현
 
 * Jetpack Compose UI
 * 사진 업로드 화면
