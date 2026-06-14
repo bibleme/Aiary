@@ -118,7 +118,7 @@ Android Studio → Open → frontend/Android
 에뮬레이터 실행 → Run
 ```
 ## 📺 Demo
-![Aiary Demo](https://github.com/bibleme/Aiary/raw/main/demo.gif)
+
 ---
 
 ## 👥 **Contributors**
