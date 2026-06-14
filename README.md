@@ -149,7 +149,7 @@ wiki page: https://github.com/bibleme/Aiary/wiki/Frontend
 * 마이페이지
 * Retrofit 기반 서버 통신
 
-📚 주요 라이브러리 
+📚 **주요 라이브러리** 
 | **라이브러리** | **용도 및 설명** |
 | --- | --- |
 | **Jetpack Compose** | 100% 선언형 UI 툴킷으로 상태(State) 기반의 직관적인 화면 렌더링 |
