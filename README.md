@@ -74,6 +74,17 @@ wiki page: https://github.com/bibleme/Aiary/wiki/CV
 * 한 줄 일기·하루 일기·CV 분석 결과를 활용한 월별 스토리 리포트 생성(GPT)
 * 월간 리포트 UI 및 통계 시각화에 분석 결과 반영
 
+📚 **주요 라이브러리**
+
+| 라이브러리 | 용도 및 설명 |
+| :--- | :--- |
+| **PyTorch & TorchVision** | CV 모델 추론 및 텐서 연산 기반 |
+| **Ultralytics** | YOLO 모델을 활용한 객체 탐지(yolo26m) 및 자세(Pose) 인식(yolo26m-pose) |
+| **CLIP (ViT-B/32)** | 15개 프롬프트 기반 장면 분류 및 scene vector 추출 |
+| **DeepFace (VGG-Face)** | 얼굴 검증, 인물 역할 분류, 표정 기반 감정 추정 |
+| **Transformers (SigLIP)** | 객체 임베딩 추출 및 cosine similarity 기반 인스턴스 매칭 |
+| **OpenCV & Pillow** | 이미지 입출력 및 crop 등 전처리 |
+
 ---
 
 ### 📱 **NLP**
