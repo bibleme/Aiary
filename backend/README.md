@@ -13,24 +13,46 @@
 backend/
 │
 ├── app/
-│   ├── api/endpoints/
-│   │   ├── user.py
+│   ├── api/endpoints/              # API 라우터 (엔드포인트)
+│   │   ├── diary.py                # 일기 관련 API
+│   │   ├── export.py               # 내보내기 관련 API
+│   │   ├── report.py               # 리포트 관련 API
+│   │   └── user.py                 # 유저(인증/가입) 관련 API
+│   │
+│   ├── db/                         # 데이터베이스 설정 및 관리
+│   │   ├── __init__.py
+│   │   ├── crud.py                 # DB 데이터 조작 (Create, Read, Update, Delete)
+│   │   ├── database.py             # DB 연결 세션 관리
+│   │   └── model.py                # SQLModel (테이블 스키마)
+│   │
+│   ├── schemas/                    # Pydantic 데이터 검증 모델 (Request/Response)
 │   │   ├── diary.py
-│   ├── db/
-│   │   ├── database.py
-│   │   ├── model.py
-│   ├── services/
-│       ├── ai_generator.py             # GPT Vision + 요약
-│       ├── daily_diary_generator.py    # KoBART 줄글 일기 모델
+│   │   ├── export.py
+│   │   └── user.py
+│   │
+│   ├── services/                   # 핵심 비즈니스 로직 및 AI 파이프라인
+│   │   ├── __init__.py
+│   │   ├── ai_generator.py                  # AI 텍스트 생성 관련 서비스
+│   │   ├── daily_diary_generator_v3.py      # 고도화된 최신 하루 일기 생성 모델
+│   │   ├── daily_diary_generator_v3_eval.py # 일기 생성 모델 평가 로직
+│   │   ├── report_generator.py              # 월간 리포트 및 통계 생성
+│   │   ├── security.py                      # 비밀번호 해싱 및 JWT 토큰 보안 로직
+│   │   └── vision_analyzer.py               # 컴퓨터 비전(CV) 객체/감정 분석 로직
+│   │
+│   └── config.py                   # 환경 변수 및 서버 설정 관리
 │
-├── media/images/                       # 업로드 이미지 저장
+├── media/images/                   # CV 타겟 인식용 기준 사진 및 로컬 테스트 이미지
+│   ├── my_child_ref.jpg
+│   ├── ref_2026-04.jpg
+│   └── test_image2.jpg
 │
-├── models/                             # KoBART 모델 위치
+├── scripts/                        # 배치 작업 및 자동화 스크립트 폴더
 │
-├── create_tables.py
-├── requirements.txt
-├── .env.example
-└── main.py
+├── Dockerfile                      # 도커 컨테이너 빌드 설정 파일
+├── README.md                       # 백엔드 프로젝트 설명서
+├── create_tables.py                # 초기 DB 테이블 생성 스크립트
+├── main.py                         # FastAPI 애플리케이션 실행 엔트리포인트 (uvicorn)
+└── requirements.txt                # 파이썬 필수 의존성 패키지 목록
 ```
 
 ---
