@@ -76,6 +76,12 @@ wiki page: https://github.com/bibleme/Aiary/wiki/NLP
 
 * 한 줄 일기 생성 (GPT-4.1-mini)
 * 하루 일기 생성 (fine-tuned KoBART)
+```mermaid
+graph LR
+    A[Situation Pool] --> B[GPT Anchor<br>2,000 pairs]
+    B --> C[Self-training<br>Round2~Round5]
+    C -->|Final realistic train 1,095 / eval 58| D[Realistic SFT]
+```
 * 학습 데이터 구성 (Round 1~Round 5)
 * 월간 리포트 (GPT)
 
