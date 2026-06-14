@@ -59,11 +59,12 @@ backend/
 
 ## 🔐 환경 변수(.env)
 
-`.env.example`을 복사하여 `.env`를 생성:
+`.env.example`을 복사하여 `.env`를 생성한 후, 프로젝트 환경에 맞게 값을 입력합니다.
 
-```
-OPENAI_API_KEY=YOUR_KEY
-DATABASE_URL=postgresql+asyncpg://aiary_user:aiary_pass@localhost:5432/aiary_db
+```env
+OPENAI_API_KEY="YOUR_KEY"
+DATABASE_URL="postgresql+asyncpg://aiary_user:aiary_pass@localhost:5432/aiary_db"
+SECRET_KEY="your_secret_key_here" # JWT 토큰 인증을 위한 필수 키
 ```
 
 ---
@@ -73,9 +74,9 @@ DATABASE_URL=postgresql+asyncpg://aiary_user:aiary_pass@localhost:5432/aiary_db
 ```bash
 cd backend
 python3 -m venv venv
-source venv/bin/activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8000
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Swagger 문서 → [[http://127.0.0.1:8000/docs](http://3.35.185.251:8000/docs)]
