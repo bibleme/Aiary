@@ -117,4 +117,4 @@ Google Drive 모델 다운로드 →
 backend/models/day_diary_from_summary_v2/
 ```
 
-
+https://github.com/subin0910/Aiary-backend/issues/1#issue-4658088999
