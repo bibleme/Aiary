@@ -41,6 +41,7 @@ Aiary/
 ---
 
 ### 🖥 **CV** 
+wiki page: https://github.com/bibleme/Aiary/wiki/CV
 
 * 한 줄 일기 생성 (GPT)
 * 하루 일기 생성 (KoBART)
@@ -51,6 +52,8 @@ Aiary/
 ---
 
 ### 📱 **NLP**
+wiki page: https://github.com/bibleme/Aiary/wiki/NLP
+
 * 한 줄 일기 생성 (GPT-4.1-mini)
 * 하루 일기 생성 (fine-tuned KoBART)
 * 학습 데이터 구성 (Round 1~Round 5)
@@ -59,7 +62,7 @@ Aiary/
 ---
 
 ### 🖥 **백엔드(FastAPI)**
-
+wiki page: https://github.com/bibleme/Aiary/wiki/Backend
 * 사진 업로드 API
 * 한 줄 일기 생성 API
 * 하루 줄글 일기 생성 API (GPT)
@@ -71,6 +74,7 @@ Aiary/
 ---
 
 ### 📱 **프론트엔드(Android)**
+wiki page: https://github.com/bibleme/Aiary/wiki
 
 * Jetpack Compose UI
 * 사진 업로드 화면
