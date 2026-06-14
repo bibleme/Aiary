@@ -152,6 +152,12 @@ Android Studio → Open → frontend/Android
 
 ---
 
+## 📻 **Demo**
+데모 영상 아래 링크에서 확인
+👉 https://github.com/subin0910/Aiary-backend/issues/1#issue-4658088999
+
+---
+
 ## 👥 **Contributors**
 
 | 역할       | 담당      |
