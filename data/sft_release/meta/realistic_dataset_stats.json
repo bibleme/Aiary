@@ -1,0 +1,13 @@
+{
+  "gpt_input_path": "/Users/jeongseong-gyeong/Documents/aiary/generated/aiary_v3_realistic_daily_20260509/data/gpt_realistic_daily_sft.jsonl",
+  "gpt_valid": 1000,
+  "gpt_train": 950,
+  "gpt_eval": 50,
+  "review_valid": 37,
+  "review_train_unique": 29,
+  "review_eval_unique": 8,
+  "review_repeat": 5,
+  "review_train_oversampled": 145,
+  "final_train": 1095,
+  "final_eval": 58
+}

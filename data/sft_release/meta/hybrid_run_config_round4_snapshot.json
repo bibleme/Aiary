@@ -1,0 +1,41 @@
+{
+  "seed": 777,
+  "photo_count_dist": {
+    "1": 0.08,
+    "2": 0.12,
+    "3": 0.24,
+    "4": 0.22,
+    "5": 0.18,
+    "6": 0.08,
+    "7": 0.04,
+    "8": 0.02,
+    "9": 0.01,
+    "10": 0.01
+  },
+  "daily_length_dist": {
+    "SHORT": 0.25,
+    "MEDIUM": 0.55,
+    "LONG": 0.2
+  },
+  "persona_ratio": 0.2,
+  "noise_prob": {
+    "drop_one": 0.35,
+    "shuffle": 0.3,
+    "omit_object": 0.5,
+    "omit_time": 0.6,
+    "insert_adverb": 0.25,
+    "tighten": 0.2
+  },
+  "paths": {
+    "situation_csv": "data/situation_pool_v3_semantic_5000.csv",
+    "state_dict_csv": "data/state_surface_dictionary_v1.csv",
+    "out_dir": "generated/aiary_v3_hybrid_20260220_014739"
+  },
+  "round_idx": 4,
+  "student_gen_target": 10000,
+  "gpt_rewrite_ratio": 0.2,
+  "keep_train_top_ratio": 0.35,
+  "current_student_path": "generated/aiary_v3_hybrid_20260220_014739/models/kobart_student_round3",
+  "next_student_path": "generated/aiary_v3_hybrid_20260220_014739/models/kobart_student_round4",
+  "teacher_model": "gpt-4.1-mini"
+}
