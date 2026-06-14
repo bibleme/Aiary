@@ -97,7 +97,7 @@ wiki page: https://github.com/bibleme/Aiary/wiki/Backend
 ---
 
 ### 📱 **프론트엔드(Android)**
-wiki page: https://github.com/bibleme/Aiary/wiki
+wiki page: https://github.com/bibleme/Aiary/wiki/Frontend
 
 사용자가 아이 사진을 쉽게 업로드하고, AI가 생성한 일기와 월간 성장 리포트를 직관적으로 확인할 수 있도록 구현
 
