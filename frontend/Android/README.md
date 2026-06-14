@@ -13,6 +13,7 @@ frontend/Android/app/src/main/java/com/example/aiary/
 │
 ├── data/
 │   ├── ApiModels.kt
+│   ├── StoryBookData.kt
 │   ├── UserSession.kt
 │
 ├── network/
@@ -20,12 +21,17 @@ frontend/Android/app/src/main/java/com/example/aiary/
 │   └── RetrofitClient.kt
 │
 ├── ui/
+│   ├── BookStoryScreen.kt
 │   ├── HomeScreen.kt
 │   ├── ImageUploadScreen.kt
 │   ├── CalendarScreen.kt
-│   ├── BookDiaryScreen.kt
+│   ├── LoginViewModel
+│   ├── ReportWrapperScreen.kt
+│   ├── MainActivity.kt
+│   ├── CardDiary.kt
 │   ├── SignUpScreen.kt
 │   └── MypageScreen.kt
+│   ├── MypageViewModel
 ```
 
 ---
@@ -35,7 +41,7 @@ frontend/Android/app/src/main/java/com/example/aiary/
 `RetrofitClient.kt`:
 
 ```kotlin
-private const val BASE_URL = "http://<EC2_OR_LOCAL_IP>:8000/"
+private const val BASE_URL = "http://3.35.185.251:8000/
 ```
 
 AWS 서버가 켜져 있다면:
