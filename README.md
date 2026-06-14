@@ -88,11 +88,6 @@ Aiary/
 아래 링크에서 다운로드:
 
 👉 [https://huggingface.co/bibleme/daily_aiary_v6/tree/main/kobart_student_round5_realistic_daily]
-다운로드 후 복사 경로:
-
-```
-backend/models/day_diary_from_summary_v2/
-```
 
 ---
 
@@ -116,7 +111,6 @@ Swagger → [http://3.35.185.251:8000/docs](http://3.35.185.251:8000/docs)
 Android Studio → Open → frontend/Android
 에뮬레이터 실행 → Run
 ```
-## 📺 Demo
 
 ---
 
