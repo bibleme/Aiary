@@ -10,6 +10,11 @@
 
 FastAPI 백엔드 + Android 프론트 + PostgreSQL 데이터베이스 + AWS S3 이미지 저장소 + NLP 및 CV 분석 모듈이 하나의 프로젝트에서 통합된 AI 데일리 다이어리 앱입니다.
 
+### 🔗 **배포된 API 문서 (Swagger UI)**
+백엔드 및 AI 모델은 AWS EC2 서버에 API화되어 배포되었습니다.
+
+👉 http://3.35.185.251:8000/docs
+
 ---
 
 ## ✔️ **프로젝트 배경**
