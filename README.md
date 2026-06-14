@@ -108,6 +108,16 @@ wiki page: https://github.com/bibleme/Aiary/wiki/Backend
 * PostgreSQL 저장
 * AWS EC2 배포
 
+📚 **주요 라이브러리**
+
+| **라이브러리** | **용도 및 설명** |
+| :--- | :--- |
+| **FastAPI** | 고성능 비동기 RESTful API 서버 구축 및 Swagger 자동화 |
+| **Uvicorn** | FastAPI를 구동하기 위한 초고속 ASGI 웹 서버 |
+| **SQLModel (SQLAlchemy)** | 파이썬 객체와 DB를 매핑하는 ORM 및 Pydantic 데이터 검증 |
+| **PyTorch & Ultralytics** | YOLO 모델을 활용한 객체 탐지 및 자세(Pose) 인식 AI 구동 |
+| **Boto3** | AWS S3와의 연동을 통한 대용량 이미지 파일 업로드 및 관리 |
+
 ---
 
 ### 📱 **프론트엔드(Android)**
@@ -122,6 +132,14 @@ wiki page: https://github.com/bibleme/Aiary/wiki/Frontend
 * 월간 리포트
 * 마이페이지
 * Retrofit 기반 서버 통신
+
+📚 주요 라이브러리 
+| **라이브러리** | **용도 및 설명** |
+| --- | --- |
+| **Jetpack Compose** | 100% 선언형 UI 툴킷으로 상태(State) 기반의 직관적인 화면 렌더링 |
+| **Retrofit2 & OkHttp3** | 백엔드(FastAPI 등)와의 RESTful API HTTP 통신 및 JSON 직렬화 |
+| **Gson / Moshi** | API 응답 JSON 데이터를 Kotlin Data Class로 매핑 |
+| **Coil** | 비동기 이미지 로딩 (AWS S3 URL 이미지를 부드럽게 캐싱 및 렌더링) |
 
 ---
 
