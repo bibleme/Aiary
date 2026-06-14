@@ -25,17 +25,17 @@ frontend/Android/app/src/main/java/com/example/aiary/
 │   ├── Theme.kt
 │   ├── Type.kt
 
-│   ├── BookStoryScreen.kt
-│   ├── HomeScreen.kt
-│   ├── ImageUploadScreen.kt
-│   ├── CalendarScreen.kt
-│   ├── LoginViewModel
-│   ├── ReportWrapperScreen.kt
-│   ├── MainActivity.kt
-│   ├── CardDiary.kt
-│   ├── SignUpScreen.kt
-│   ├──MypageScreen.kt
-│   └── MypageViewModel
+├── BookStoryScreen.kt
+├── HomeScreen.kt
+├── ImageUploadScreen.kt
+├── CalendarScreen.kt
+├── LoginViewModel
+├── ReportWrapperScreen.kt
+├── MainActivity.kt
+├── CardDiary.kt
+├── SignUpScreen.kt
+├──MypageScreen.kt
+└── MypageViewModel
 ```
 
 ---
