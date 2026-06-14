@@ -58,6 +58,7 @@ Aiary/
 * 사진 업로드 화면
 * 생성된 일기 리스트
 * Calendar 기반 일기 기록
+* 월간 리포트
 * 마이페이지
 * Retrofit 기반 서버 통신
 
@@ -88,7 +89,7 @@ pip install -r requirements.txt
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Swagger → [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+Swagger → [http://3.35.185.251:8000/docs](http://3.35.185.251:8000/docs)
 
 ---
 
