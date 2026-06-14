@@ -45,13 +45,13 @@ frontend/Android/app/src/main/java/com/example/aiary/
 `RetrofitClient.kt`:
 
 ```kotlin
-private const val BASE_URL = "http://3.35.185.251:8000/
+private const val BASE_URL = "http://3.35.185.251:8000/"
 ```
 
 AWS 서버가 켜져 있다면:
 
 ```kotlin
-http://15.164.215.237:8000/
+http://3.35.185.251:8000/docs
 ```
 
 ---
