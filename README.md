@@ -85,10 +85,9 @@ Aiary/
 ## 📦 **모델 다운로드 안내**
 
 학습된 KoBART 모델은 용량 때문에 GitHub에 포함되지 않음.
-아래 드라이브에서 다운로드:
+아래 링크에서 다운로드:
 
-👉 [https://drive.google.com/drive/folders/1bZPq1JaPhUTS6As8tW0tvMUuIcHYiIXl](https://drive.google.com/drive/folders/1bZPq1JaPhUTS6As8tW0tvMUuIcHYiIXl)
-
+👉 [https://huggingface.co/bibleme/daily_aiary_v6/tree/main/kobart_student_round5_realistic_daily]
 다운로드 후 복사 경로:
 
 ```
