@@ -20,7 +20,7 @@ frontend/Android/app/src/main/java/com/example/aiary/
 │   ├── ApiService.kt
 │   └── RetrofitClient.kt
 │
-├── ui/
+├── ui/theme/
 │   ├── Color.kt
 │   ├── Theme.kt
 │   ├── Type.kt
