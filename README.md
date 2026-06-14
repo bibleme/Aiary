@@ -178,6 +178,12 @@ Swagger → [http://3.35.185.251:8000/docs](http://3.35.185.251:8000/docs)
 3. Gradle Sync가 완료될 때까지 대기
 
 4. **API 서버 연동**: `local.properties` 파일이나 `NetworkModule`에 백엔드 서버의 Base URL을 입력
+```
+# local.properties 예시
+BASE_URL="http://3.35.185.251:8000"
+```
+
+5. 에뮬레이터 또는 Android 실기기를 연결한 후 **Run (Shift + F10)** 을 실행
 
 ---
 
