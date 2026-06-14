@@ -34,7 +34,7 @@ frontend/Android/app/src/main/java/com/example/aiary/
 ├── MainActivity.kt
 ├── CardDiary.kt
 ├── SignUpScreen.kt
-├──MypageScreen.kt
+├── MypageScreen.kt
 └── MypageViewModel
 ```
 
