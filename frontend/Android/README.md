@@ -14,7 +14,7 @@ frontend/Android/app/src/main/java/com/example/aiary/
 ├── data/
 │   ├── ApiModels.kt
 │   ├── StoryBookData.kt
-│   ├── UserSession.kt
+│   └── UserSession.kt
 │
 ├── network/
 │   ├── ApiService.kt
