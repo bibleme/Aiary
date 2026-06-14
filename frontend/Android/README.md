@@ -21,6 +21,10 @@ frontend/Android/app/src/main/java/com/example/aiary/
 │   └── RetrofitClient.kt
 │
 ├── ui/
+│   ├── Color.kt
+│   ├── Theme.kt
+│   ├── Type.kt
+
 │   ├── BookStoryScreen.kt
 │   ├── HomeScreen.kt
 │   ├── ImageUploadScreen.kt
