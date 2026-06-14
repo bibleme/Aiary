@@ -168,10 +168,16 @@ Swagger → [http://3.35.185.251:8000/docs](http://3.35.185.251:8000/docs)
 
 ## ▶️ **프론트 실행 방법**
 
+1. **레포지토리 클론:**
+```bash
+   git clone [https://github.com/bibleme/Aiary.git](https://github.com/bibleme/Aiary.git)
 ```
-Android Studio → Open → frontend/Android
-에뮬레이터 실행 → Run
-```
+
+2. Android Studio를 실행하고 클론한 폴더 내의 `frontend` (또는 `android`) 디렉토리 열기
+
+3. Gradle Sync가 완료될 때까지 대기
+
+4. **API 서버 연동**: `local.properties` 파일이나 `NetworkModule`에 백엔드 서버의 Base URL을 입력
 
 ---
 
