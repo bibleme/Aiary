@@ -61,14 +61,6 @@ backend/
 
 `.env.example`을 복사하여 `.env`를 생성한 후, 프로젝트 환경에 맞게 값을 입력합니다.
 
-```env
-OPENAI_API_KEY="YOUR_KEY"
-DATABASE_URL="postgresql+asyncpg://aiary_user:aiary_pass@localhost:5432/aiary_db"
-SECRET_KEY="your_secret_key_here" # JWT 토큰 인증을 위한 필수 키
-```
-
----
-
 ## 🚀 서버 실행
 
 ```bash
