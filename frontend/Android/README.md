@@ -1,7 +1,7 @@
 
 # 📱 Aiary Android App – Jetpack Compose
 
-사진 업로드 → 한 줄 일기 → 하루 일기 → 달력 기반 관리
+사진 업로드 → 한 줄 일기 → 하루 일기 → 월간 리포트
 전체 흐름을 제공하는 Android 앱입니다.
 
 ---
@@ -45,13 +45,7 @@ frontend/Android/app/src/main/java/com/example/aiary/
 `RetrofitClient.kt`:
 
 ```kotlin
-private const val BASE_URL = "http://3.35.185.251:8000/"
-```
-
-AWS 서버가 켜져 있다면:
-
-```kotlin
-http://3.35.185.251:8000/docs
+private const val BASE_URL = "[http://3.35.185.251:8000/](http://3.35.185.251:8000/)"
 ```
 
 ---
@@ -60,9 +54,8 @@ http://3.35.185.251:8000/docs
 
 1️⃣ Android Studio 실행
 2️⃣ `frontend/Android` 폴더 열기
-3️⃣ 에뮬레이터 실행
+3️⃣ 안드로이드 스마트폰 기기 연결 또는 에뮬레이터 실행
 4️⃣ Run 버튼 클릭
-5️⃣ 백엔드 서버 실행 필수
 
 ---
 
